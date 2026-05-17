@@ -188,6 +188,16 @@ func renderLogDetail(t tui.Theme, width int, e dsm.LogEntry) string {
 	return strings.Join(parts, "\n")
 }
 
+// coalesce returns the first non-empty argument.
+func coalesce(s ...string) string {
+	for _, x := range s {
+		if x != "" {
+			return x
+		}
+	}
+	return ""
+}
+
 func iOrDash(i int) string {
 	if i == 0 {
 		return "—"

@@ -89,6 +89,7 @@ func startTUI(parentCtx context.Context) error {
 		views.NewPackages(vctx),
 		views.NewServices(vctx),
 		views.NewNetwork(vctx),
+		views.NewSystem(vctx),
 		views.NewLogs(vctx),
 	)
 
