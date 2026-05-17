@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
@@ -316,6 +317,22 @@ func loginWithFallback(ctx context.Context, pick *onboardingPick, creds *credent
 
 	resp, err := attempt(pick.scheme, pick.port)
 	scheme, port := pick.scheme, pick.port
+
+	// DSM ships a self-signed cert by default. When the user picked an
+	// https endpoint (mDNS-discovered or tailnet) we hit a verification
+	// error — ask them once, then retry with verification skipped.
+	if err != nil && isSelfSignedCert(err) {
+		ok, askErr := confirmSelfSignedCert(pick.host)
+		if askErr != nil {
+			return nil, "", 0, askErr
+		}
+		if !ok {
+			return nil, "", 0, errors.New("aborted — TLS cert not trusted; rerun and pick http or accept the self-signed cert")
+		}
+		pick.insecure = true
+		resp, err = attempt(scheme, port)
+	}
+
 	if err != nil && isProtocolMismatch(err) {
 		altScheme, altPort := flipScheme(scheme, port)
 		fmt.Printf("  %s protocol mismatch — retrying with %s:%d\n",
@@ -330,6 +347,39 @@ func loginWithFallback(ctx context.Context, pick *onboardingPick, creds *credent
 		return nil, "", 0, err
 	}
 	return resp, scheme, port, nil
+}
+
+// isSelfSignedCert detects DSM's "synology" self-signed certificate
+// rejection from Go's TLS stack.
+func isSelfSignedCert(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "x509:") &&
+		(strings.Contains(s, "certificate is not trusted") ||
+			strings.Contains(s, "certificate signed by unknown authority") ||
+			strings.Contains(s, "unable to verify") ||
+			strings.Contains(s, "self-signed"))
+}
+
+// confirmSelfSignedCert is a small huh prompt that asks the user to
+// trust the self-signed cert. We say yes/no, with no defaulting in
+// either direction.
+func confirmSelfSignedCert(host string) (bool, error) {
+	var trust bool
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("TLS certificate not trusted").
+			Description(host + " is using a self-signed certificate. This is normal for DSM. Trust it for this profile?").
+			Affirmative("Trust").
+			Negative("Cancel").
+			Value(&trust),
+	)).WithTheme(theme())
+	if err := form.Run(); err != nil {
+		return false, err
+	}
+	return trust, nil
 }
 
 // theme is the synoctl-branded huh theme. We start from huh's
