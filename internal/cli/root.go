@@ -60,4 +60,3 @@ func runTUI(cmd *cobra.Command, args []string) error {
 	// on the command tree.
 	return startTUI(cmd.Context())
 }
-

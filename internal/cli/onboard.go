@@ -102,8 +102,8 @@ type credentials struct {
 }
 
 const (
-	mauve = lipgloss.Color("#cba6f7")
-	muted = lipgloss.Color("#a6adc8")
+	mauve      = lipgloss.Color("#cba6f7")
+	muted      = lipgloss.Color("#a6adc8")
 	accentBlue = lipgloss.Color("#89b4fa")
 )
 

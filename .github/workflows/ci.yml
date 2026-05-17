@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: make fmt-check
+
+      - name: Vet
+        run: make vet
+
+      - name: Race tests
+        run: go test -race ./...
+
+      - name: Lint GitHub Actions workflows
+        run: make workflow-lint
+
+      - name: Cross-platform builds
+        run: make build-all
+
+      - name: Validate release config
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: v2.15.2
+          args: check
+
+      - name: Snapshot release build
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: v2.15.2
+          args: release --snapshot --clean --skip=publish
+
+      - name: Generate Homebrew formula (dry run)
+        run: |
+          VERSION=$(sed -n 's/.*"version":"\([^"]*\)".*/\1/p' dist/metadata.json)
+          test -n "${VERSION}"
+          SHA_DARWIN_AMD64=$(sha256sum "dist/synoctl_${VERSION}_darwin_amd64.tar.gz" | awk '{print $1}')
+          SHA_DARWIN_ARM64=$(sha256sum "dist/synoctl_${VERSION}_darwin_arm64.tar.gz" | awk '{print $1}')
+          SHA_LINUX_AMD64=$(sha256sum "dist/synoctl_${VERSION}_linux_amd64.tar.gz" | awk '{print $1}')
+          SHA_LINUX_ARM64=$(sha256sum "dist/synoctl_${VERSION}_linux_arm64.tar.gz" | awk '{print $1}')
+
+          scripts/generate_homebrew_formula.sh \
+            --formula-name synoctl \
+            --formula-class Synoctl \
+            --binary synoctl \
+            --desc "A TUI-first management tool for Synology DSM" \
+            --homepage "https://github.com/${REPO}" \
+            --version "${VERSION}" \
+            --repo "${REPO}" \
+            --license "MIT" \
+            --sha-darwin-amd64 "${SHA_DARWIN_AMD64}" \
+            --sha-darwin-arm64 "${SHA_DARWIN_ARM64}" \
+            --sha-linux-amd64 "${SHA_LINUX_AMD64}" \
+            --sha-linux-arm64 "${SHA_LINUX_ARM64}" \
+            --output dist/synoctl.rb
+
+      - name: Validate Homebrew formula syntax
+        run: ruby -c dist/synoctl.rb

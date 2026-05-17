@@ -17,12 +17,12 @@ type LoginRequest struct {
 
 // LoginResponse mirrors the SYNO.API.Auth/login data envelope.
 type LoginResponse struct {
-	SID         string `json:"sid"`
-	DID         string `json:"did,omitempty"`           // device token, when requested
-	DeviceID    string `json:"device_id,omitempty"`     // alternative name on some firmware
-	SynoToken   string `json:"synotoken,omitempty"`     // CSRF token
-	IsPortal    bool   `json:"is_portal,omitempty"`
-	Account     string `json:"account,omitempty"`
+	SID       string `json:"sid"`
+	DID       string `json:"did,omitempty"`       // device token, when requested
+	DeviceID  string `json:"device_id,omitempty"` // alternative name on some firmware
+	SynoToken string `json:"synotoken,omitempty"` // CSRF token
+	IsPortal  bool   `json:"is_portal,omitempty"`
+	Account   string `json:"account,omitempty"`
 }
 
 // Login authenticates the client. On success, SID/synotoken are stored and

@@ -9,8 +9,8 @@ import (
 // LogEntry is a single line from the system log.
 type LogEntry struct {
 	ID    int64  `json:"id"`
-	Time  string `json:"time"`     // human-formatted by server
-	Level string `json:"level"`    // info/warn/err
+	Time  string `json:"time"`  // human-formatted by server
+	Level string `json:"level"` // info/warn/err
 	User  string `json:"user"`
 	IP    string `json:"ip"`
 	Event string `json:"event"`

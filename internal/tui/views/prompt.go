@@ -14,13 +14,13 @@ import (
 // value; the modal emits SubmittedMsg{Token, Value} on enter or
 // CancelledMsg{Token} on esc.
 type Prompt struct {
-	theme  tui.Theme
-	open   bool
-	title  string
-	hint   string
-	token  string
-	input  textinput.Model
-	width  int
+	theme tui.Theme
+	open  bool
+	title string
+	hint  string
+	token string
+	input textinput.Model
+	width int
 }
 
 // SubmittedMsg fires when the user accepts the prompt.

@@ -11,15 +11,15 @@ import (
 // Column is one column in a rendered table.
 type Column struct {
 	Header string
-	Width  int             // 0 → flex, distributes remaining width evenly
+	Width  int // 0 → flex, distributes remaining width evenly
 	Align  lipgloss.Position
 }
 
 // Cell is a single rendered cell — content plus an optional style override.
 // Use a zero Cell to mean "just text, default style".
 type Cell struct {
-	Text  string
-	Style lipgloss.Style
+	Text     string
+	Style    lipgloss.Style
 	HasStyle bool
 }
 
@@ -30,9 +30,10 @@ func Plain(s string) Cell { return Cell{Text: s} }
 func Styled(s string, st lipgloss.Style) Cell { return Cell{Text: s, Style: st, HasStyle: true} }
 
 // Table renders a complete table widget for use inside a card. It draws:
-//   * one header row in the accent colour
-//   * zebra-striped body rows
-//   * the row at `selected` highlighted (-1 to disable)
+//   - one header row in the accent colour
+//   - zebra-striped body rows
+//   - the row at `selected` highlighted (-1 to disable)
+//
 // Width is the total interior width available; columns with Width=0 split
 // the remaining space evenly after the explicit widths are subtracted.
 func Table(theme tui.Theme, width, height int, cols []Column, rows [][]Cell, selected int) string {

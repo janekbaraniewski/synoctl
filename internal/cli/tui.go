@@ -79,28 +79,14 @@ func startTUI(parentCtx context.Context) error {
 	logger := log.NewWithOptions(os.Stderr, log.Options{ReportTimestamp: false, Prefix: "tui"})
 	vctx := tui.ViewContext{Client: client, Theme: theme, Keys: tui.DefaultKeys(), Logger: logger}
 
-	// Top-level tabs consolidate related screens. Each group renders its
-	// own sub-tab bar above the active sub-view; [/] or H/L cycle
-	// between them. This keeps the top-level tab bar short while still
-	// exposing every screen.
+	// Each top-level tab is a single comprehensive page — no sub-tabs.
+	// Storage, Apps and Admin compose related entities into one
+	// scrollable surface; the cursor moves through everything visible.
 	app := tui.NewApp(client, theme, logger,
 		views.NewDashboard(vctx),
-		views.NewGroup("storage", "Storage", "▮",
-			views.NewVolumes(vctx),
-			views.NewDisks(vctx),
-			views.NewShares(vctx),
-			views.NewFiles(vctx),
-		),
-		views.NewGroup("apps", "Apps", "▣",
-			views.NewPackages(vctx),
-			views.NewServices(vctx),
-		),
-		views.NewGroup("admin", "Admin", "⌂",
-			views.NewSystem(vctx),
-			views.NewUsers(vctx),
-			views.NewNetwork(vctx),
-			views.NewLogs(vctx),
-		),
+		views.NewStoragePage(vctx),
+		views.NewAppsPage(vctx),
+		views.NewAdminPage(vctx),
 	)
 
 	prog := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())

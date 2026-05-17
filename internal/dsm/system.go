@@ -13,13 +13,13 @@ import (
 type SystemInfo struct {
 	Model           string `json:"model"`
 	Serial          string `json:"serial"`
-	Version         string `json:"firmware_ver"`   // "DSM 7.0.1-42218 Update 7"
+	Version         string `json:"firmware_ver"` // "DSM 7.0.1-42218 Update 7"
 	FirmwareDate    string `json:"firmware_date"`
 	NTPServer       string `json:"ntp_server"`
 	NTPEnabled      bool   `json:"enabled_ntp"`
 	TimeZone        string `json:"time_zone"`
 	TimeZoneDesc    string `json:"time_zone_desc"`
-	Temperature     int    `json:"sys_temp"`        // celsius
+	Temperature     int    `json:"sys_temp"` // celsius
 	TemperatureWarn bool   `json:"temperature_warning"`
 	UptimeSeconds   string `json:"up_time"`         // "hhh:mm:ss" on DSM 7
 	SystemTime      string `json:"time"`            // "2026-05-17 22:31:18"
@@ -28,7 +28,7 @@ type SystemInfo struct {
 	CPUFamily       string `json:"cpu_family"`
 	CPUSeries       string `json:"cpu_series"`
 	CPUVendor       string `json:"cpu_vendor"`
-	RAMTotalMB      int    `json:"ram_size"`        // MiB
+	RAMTotalMB      int    `json:"ram_size"` // MiB
 	SupportESATA    string `json:"support_esata"`
 	USBDev          []any  `json:"usb_dev,omitempty"`
 	SataDev         []any  `json:"sata_dev,omitempty"`
@@ -126,31 +126,31 @@ type Utilization struct {
 	} `json:"network"`
 	Disk struct {
 		Disk []struct {
-			Device     string `json:"device"`     // sda, sdb …
+			Device      string `json:"device"` // sda, sdb …
 			DisplayName string `json:"display_name,omitempty"`
-			ReadAccess int    `json:"read_access"`
-			WriteAccess int   `json:"write_access"`
-			ReadByte   int64  `json:"read_byte"`
-			WriteByte  int64  `json:"write_byte"`
-			Util       int    `json:"util"`
+			ReadAccess  int    `json:"read_access"`
+			WriteAccess int    `json:"write_access"`
+			ReadByte    int64  `json:"read_byte"`
+			WriteByte   int64  `json:"write_byte"`
+			Util        int    `json:"util"`
 		} `json:"disk"`
 		Total struct {
-			Device     string `json:"device"`
-			ReadAccess int    `json:"read_access"`
-			WriteAccess int   `json:"write_access"`
-			ReadByte   int64  `json:"read_byte"`
-			WriteByte  int64  `json:"write_byte"`
-			Util       int    `json:"util"`
+			Device      string `json:"device"`
+			ReadAccess  int    `json:"read_access"`
+			WriteAccess int    `json:"write_access"`
+			ReadByte    int64  `json:"read_byte"`
+			WriteByte   int64  `json:"write_byte"`
+			Util        int    `json:"util"`
 		} `json:"total"`
 	} `json:"disk"`
 	Space struct {
 		Total struct {
-			Device     string `json:"device"`
-			ReadAccess int    `json:"read_access"`
-			WriteAccess int   `json:"write_access"`
-			ReadByte   int64  `json:"read_byte"`
-			WriteByte  int64  `json:"write_byte"`
-			Util       int    `json:"util"`
+			Device      string `json:"device"`
+			ReadAccess  int    `json:"read_access"`
+			WriteAccess int    `json:"write_access"`
+			ReadByte    int64  `json:"read_byte"`
+			WriteByte   int64  `json:"write_byte"`
+			Util        int    `json:"util"`
 		} `json:"total"`
 	} `json:"space"`
 	Time int64 `json:"time"`

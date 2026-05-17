@@ -25,18 +25,18 @@ type Storage struct {
 // (not snake_case), and the canonical id is `volume_1`/`volume_2`/… —
 // the user-visible "/volume1" path lives under VolPath.
 type Volume struct {
-	ID           string `json:"id"`           // "volume_1"
-	VolPath      string `json:"vol_path"`     // "/volume1"
-	Container    string `json:"container"`    // "internal"
-	DeviceType   string `json:"device_type"`  // "shr_with_1_disk_protect", "raid5", …
-	Desc         string `json:"desc"`         // "SHR" / "Basic" / …
-	FSType       string `json:"fs_type"`      // "btrfs", "ext4"
-	NumID        int    `json:"num_id"`
-	PoolPath     string `json:"pool_path,omitempty"`
-	RaidType     string `json:"raidType,omitempty"` // "single", "shr1", "raid5"
-	SpacePath    string `json:"space_path,omitempty"`
-	IsWritable   bool   `json:"is_writable,omitempty"`
-	Size         struct {
+	ID         string `json:"id"`          // "volume_1"
+	VolPath    string `json:"vol_path"`    // "/volume1"
+	Container  string `json:"container"`   // "internal"
+	DeviceType string `json:"device_type"` // "shr_with_1_disk_protect", "raid5", …
+	Desc       string `json:"desc"`        // "SHR" / "Basic" / …
+	FSType     string `json:"fs_type"`     // "btrfs", "ext4"
+	NumID      int    `json:"num_id"`
+	PoolPath   string `json:"pool_path,omitempty"`
+	RaidType   string `json:"raidType,omitempty"` // "single", "shr1", "raid5"
+	SpacePath  string `json:"space_path,omitempty"`
+	IsWritable bool   `json:"is_writable,omitempty"`
+	Size       struct {
 		FreeInode  string `json:"free_inode"`
 		TotalInode string `json:"total_inode"`
 		Total      string `json:"total"` // bytes, as string

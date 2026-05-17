@@ -9,12 +9,12 @@ import (
 // CPU is reported in ticks (DSM's internal counter — not a percentage of
 // total CPU), so it's only useful in relative form. Mem is RSS in KiB.
 type Process struct {
-	PID        int    `json:"pid"`
-	Command    string `json:"command"`
-	CPU        int    `json:"cpu"`        // relative ticks
-	Mem        int    `json:"mem"`        // RSS in KiB
-	MemShared  int    `json:"mem_shared"` // KiB
-	Status     string `json:"status"`     // R / S / D / Z …
+	PID       int    `json:"pid"`
+	Command   string `json:"command"`
+	CPU       int    `json:"cpu"`        // relative ticks
+	Mem       int    `json:"mem"`        // RSS in KiB
+	MemShared int    `json:"mem_shared"` // KiB
+	Status    string `json:"status"`     // R / S / D / Z …
 }
 
 // Processes returns the current process list. The list is fetched in

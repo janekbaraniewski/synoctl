@@ -6,7 +6,12 @@ import (
 	"strings"
 )
 
-func boolStr(b bool) string { if b { return "1" }; return "0" }
+func boolStr(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}
 
 func hostnameOr(fallback string) string {
 	h, err := os.Hostname()

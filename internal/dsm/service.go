@@ -34,22 +34,22 @@ func (s Service) Enabled() bool { return s.EnableStatus == "enabled" }
 func (s Service) Toggleable() bool { return s.EnableStatus != "static" }
 
 var serviceFriendlyNames = map[string]string{
-	"atalk":                          "AppleTalk (AFP)",
-	"bonjour":                        "Bonjour mDNS",
-	"cupsd":                          "CUPS print daemon",
-	"ftp-pure":                       "FTP",
-	"ftp-ssl":                        "FTP over SSL",
-	"nfs-server":                     "NFS",
-	"ntpd":                           "NTP",
-	"pkg-iscsi":                      "iSCSI",
-	"pkg-synosamba-smbd":             "SMB / CIFS",
+	"atalk":                            "AppleTalk (AFP)",
+	"bonjour":                          "Bonjour mDNS",
+	"cupsd":                            "CUPS print daemon",
+	"ftp-pure":                         "FTP",
+	"ftp-ssl":                          "FTP over SSL",
+	"nfs-server":                       "NFS",
+	"ntpd":                             "NTP",
+	"pkg-iscsi":                        "iSCSI",
+	"pkg-synosamba-smbd":               "SMB / CIFS",
 	"pkg-synosamba-wstransfer-genconf": "WS-Discovery",
-	"rsync":                          "Rsync",
-	"sshd":                           "SSH",
-	"telnetd":                        "Telnet",
-	"snmpd":                          "SNMP",
-	"webstation":                     "Web Station",
-	"upnp":                           "UPnP / DLNA",
+	"rsync":                            "Rsync",
+	"sshd":                             "SSH",
+	"telnetd":                          "Telnet",
+	"snmpd":                            "SNMP",
+	"webstation":                       "Web Station",
+	"upnp":                             "UPnP / DLNA",
 }
 
 // Services returns the system service list via SYNO.Core.Service v3 get.

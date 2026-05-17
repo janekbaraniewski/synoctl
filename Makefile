@@ -13,27 +13,43 @@ LDFLAGS        := -s -w \
                   -X $(PKG)/internal/cli.commit=$(COMMIT) \
                   -X $(PKG)/internal/cli.date=$(DATE)
 
-.PHONY: help build run install tidy fmt vet lint test discover clean all
+GOFILES        := $(shell find . -name '*.go' -not -path './vendor/*' -not -path './bin/*' -not -path './dist/*')
+
+GORELEASER     ?= goreleaser
+ACTIONLINT     ?= $(GO) run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+.PHONY: help build build-all run install tidy fmt fmt-check vet lint test discover login \
+        workflow-lint release-check release-snapshot clean ci all
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nsynoctl — make targets\n\n"} \
-	  /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2 } \
+	  /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 } \
 	  /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 
 ##@ Build
 
 build: $(BIN) ## Compile a debug binary to ./bin/synoctl
 
-$(BIN): $(shell find . -name '*.go' -not -path './bin/*' 2>/dev/null) go.mod go.sum | $(BIN_DIR)
+$(BIN): $(GOFILES) go.mod go.sum | $(BIN_DIR)
 	@echo "» building $(BIN) ($(VERSION) / $(COMMIT))"
-	@$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN) $(MAIN)
+	@CGO_ENABLED=0 $(GO) build -trimpath $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN) $(MAIN)
+
+build-all: ## Cross-compile binaries for darwin/linux × amd64/arm64
+	@mkdir -p $(BIN_DIR)
+	@for os in linux darwin; do \
+	  for arch in amd64 arm64; do \
+	    echo "» building $(BIN_DIR)/synoctl-$$os-$$arch"; \
+	    CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -ldflags "$(LDFLAGS)" \
+	      -o $(BIN_DIR)/synoctl-$$os-$$arch $(MAIN); \
+	  done; \
+	done
 
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
 install: ## Install to $GOPATH/bin (or $HOME/go/bin)
 	@echo "» installing synoctl ($(VERSION))"
-	@$(GO) install -ldflags "$(LDFLAGS)" $(MAIN)
+	@CGO_ENABLED=0 $(GO) install -trimpath -ldflags "$(LDFLAGS)" $(MAIN)
 
 ##@ Run
 
@@ -51,33 +67,38 @@ login: build ## Configure credentials for a NAS profile
 tidy: ## go mod tidy
 	@$(GO) mod tidy
 
-fmt: ## gofmt -w .
-	@$(GO) fmt ./...
+fmt: ## Format all Go files
+	@gofmt -w $(GOFILES)
+
+fmt-check: ## Check formatting (CI-friendly: non-zero on any unformatted file)
+	@test -z "$$(gofmt -l $(GOFILES))" || \
+	  (echo "go files need formatting:" && gofmt -l $(GOFILES) && exit 1)
 
 vet: ## go vet ./...
 	@$(GO) vet ./...
 
-lint: vet ## Run all available linters
-	@if command -v staticcheck >/dev/null 2>&1; then \
-	  echo "» staticcheck"; \
-	  staticcheck ./...; \
-	else \
-	  echo "» staticcheck not installed (go install honnef.co/go/tools/cmd/staticcheck@latest)"; \
-	fi
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-	  echo "» golangci-lint"; \
-	  golangci-lint run; \
-	else \
-	  echo "» golangci-lint not installed (https://golangci-lint.run)"; \
-	fi
+lint: fmt-check vet ## Run all linters
+
+workflow-lint: ## Lint .github/workflows with actionlint
+	@$(ACTIONLINT) .github/workflows/*.yml
 
 test: ## Run unit tests
 	@$(GO) test ./... -race -count=1
 
+##@ Release
+
+release-check: ## Validate .goreleaser.yml
+	@$(GORELEASER) check
+
+release-snapshot: ## Build a local snapshot release (no publish)
+	@$(GORELEASER) release --snapshot --clean --skip=publish
+
 ##@ Housekeeping
 
 clean: ## Remove build artefacts
-	@rm -rf $(BIN_DIR)
+	@rm -rf $(BIN_DIR) dist/
+
+ci: lint test workflow-lint build-all release-check ## Run the full local CI suite
 
 all: tidy fmt vet test build ## tidy → fmt → vet → test → build
 

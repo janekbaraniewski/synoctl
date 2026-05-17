@@ -174,10 +174,10 @@ func renderTwoColumnProps(t tui.Theme, inner int, kv [][2]string) string {
 
 func volumeCapabilitiesCard(t tui.Theme, width int, raw json.RawMessage) string {
 	type canDo struct {
-		Delete         bool `json:"delete"`
-		DiskReplace    bool `json:"disk_replace"`
-		ExpandByDisk   int  `json:"expand_by_disk"`
-		ConvertShr     int  `json:"convert_shr_to_pool"`
+		Delete       bool `json:"delete"`
+		DiskReplace  bool `json:"disk_replace"`
+		ExpandByDisk int  `json:"expand_by_disk"`
+		ConvertShr   int  `json:"convert_shr_to_pool"`
 	}
 	var probe struct {
 		CanDo canDo `json:"can_do"`

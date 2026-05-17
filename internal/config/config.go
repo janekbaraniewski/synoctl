@@ -16,9 +16,9 @@ type Profile struct {
 	Name     string `yaml:"name"`
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
-	Scheme   string `yaml:"scheme"`            // http | https
+	Scheme   string `yaml:"scheme"` // http | https
 	Username string `yaml:"username"`
-	Insecure bool   `yaml:"insecure,omitempty"` // skip TLS verification
+	Insecure bool   `yaml:"insecure,omitempty"`  // skip TLS verification
 	DeviceID string `yaml:"device_id,omitempty"` // stored to skip OTP next time
 }
 

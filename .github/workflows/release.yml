@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Publish release artifacts
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: v2.15.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: release
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      REPO: ${{ github.repository }}
+      TAG_NAME: ${{ github.ref_name }}
+    steps:
+      - name: Skip when Homebrew token is unavailable
+        if: env.HOMEBREW_TAP_TOKEN == ''
+        run: echo "HOMEBREW_TAP_TOKEN is not configured; skipping Homebrew tap update."
+
+      - uses: actions/checkout@v5
+        if: env.HOMEBREW_TAP_TOKEN != ''
+
+      - name: Get version from tag
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        id: version
+        run: echo "version=${TAG_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for release assets to be available
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          for i in $(seq 1 30); do
+            ASSETS=$(gh release view "${TAG_NAME}" --repo "${REPO}" --json assets -q '.assets[].name' 2>/dev/null || true)
+            if echo "$ASSETS" | grep -q "synoctl_${VERSION}_darwin_arm64.tar.gz" && \
+               echo "$ASSETS" | grep -q "synoctl_${VERSION}_darwin_amd64.tar.gz" && \
+               echo "$ASSETS" | grep -q "synoctl_${VERSION}_linux_arm64.tar.gz" && \
+               echo "$ASSETS" | grep -q "synoctl_${VERSION}_linux_amd64.tar.gz"; then
+              echo "All release assets found."
+              exit 0
+            fi
+            echo "Waiting for release assets... attempt $i/30"
+            sleep 10
+          done
+          echo "Timed out waiting for release assets"
+          exit 1
+
+      - name: Download release assets and compute checksums
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p /tmp/release-assets
+          cd /tmp/release-assets
+
+          gh release download "${TAG_NAME}" \
+            --repo "${REPO}" \
+            --pattern "synoctl_${VERSION}_darwin_amd64.tar.gz" \
+            --pattern "synoctl_${VERSION}_darwin_arm64.tar.gz" \
+            --pattern "synoctl_${VERSION}_linux_amd64.tar.gz" \
+            --pattern "synoctl_${VERSION}_linux_arm64.tar.gz"
+
+          {
+            echo "SHA_DARWIN_AMD64=$(sha256sum synoctl_${VERSION}_darwin_amd64.tar.gz | awk '{print $1}')"
+            echo "SHA_DARWIN_ARM64=$(sha256sum synoctl_${VERSION}_darwin_arm64.tar.gz | awk '{print $1}')"
+            echo "SHA_LINUX_AMD64=$(sha256sum synoctl_${VERSION}_linux_amd64.tar.gz | awk '{print $1}')"
+            echo "SHA_LINUX_ARM64=$(sha256sum synoctl_${VERSION}_linux_arm64.tar.gz | awk '{print $1}')"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate Homebrew formula
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          scripts/generate_homebrew_formula.sh \
+            --formula-name synoctl \
+            --formula-class Synoctl \
+            --binary synoctl \
+            --desc "A TUI-first management tool for Synology DSM" \
+            --homepage "https://github.com/${REPO}" \
+            --version "${VERSION}" \
+            --repo "${REPO}" \
+            --license "MIT" \
+            --sha-darwin-amd64 "${SHA_DARWIN_AMD64}" \
+            --sha-darwin-arm64 "${SHA_DARWIN_ARM64}" \
+            --sha-linux-amd64 "${SHA_LINUX_AMD64}" \
+            --sha-linux-arm64 "${SHA_LINUX_ARM64}" \
+            --output /tmp/homebrew-formula/synoctl.rb
+
+      - name: Validate Homebrew formula syntax
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        run: ruby -c /tmp/homebrew-formula/synoctl.rb
+
+      - name: Push formula to Homebrew tap
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone --branch master "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/janekbaraniewski/homebrew-tap.git" /tmp/homebrew-tap
+          mkdir -p /tmp/homebrew-tap/Formula
+          cp /tmp/homebrew-formula/synoctl.rb /tmp/homebrew-tap/Formula/synoctl.rb
+
+          cd /tmp/homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/synoctl.rb
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update synoctl to ${{ steps.version.outputs.version }}"
+          git push

@@ -7,13 +7,13 @@ import (
 
 // User is a DSM local user account.
 type User struct {
-	Name        string   `json:"name"`
-	UID         int      `json:"uid"`
-	Description string   `json:"description"`
-	Email       string   `json:"email"`
-	Expired     string   `json:"expired"` // "now", "normal", or a date
-	Groups      []string `json:"groups,omitempty"`
-	PasswordNeverExpire bool `json:"password_never_expire,omitempty"`
+	Name                string   `json:"name"`
+	UID                 int      `json:"uid"`
+	Description         string   `json:"description"`
+	Email               string   `json:"email"`
+	Expired             string   `json:"expired"` // "now", "normal", or a date
+	Groups              []string `json:"groups,omitempty"`
+	PasswordNeverExpire bool     `json:"password_never_expire,omitempty"`
 }
 
 // Users returns all local users. additional may include "email", "description",

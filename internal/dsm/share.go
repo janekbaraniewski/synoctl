@@ -11,23 +11,23 @@ import (
 // DSM 7 (not bool), and several "is_*" flags come as 0/1 too. We use int
 // for those and expose helper accessors so the UI doesn't have to know.
 type Share struct {
-	Name           string `json:"name"`
-	Path           string `json:"vol_path"`
-	Desc           string `json:"desc"`
-	Encryption     int    `json:"encryption,omitempty"` // 0 = none, 1 = encrypted
-	EncStatus      int    `json:"enc_status,omitempty"`
-	Hidden         bool   `json:"hidden"`
-	EnableRecycle  bool   `json:"enable_recycle_bin"`
+	Name          string `json:"name"`
+	Path          string `json:"vol_path"`
+	Desc          string `json:"desc"`
+	Encryption    int    `json:"encryption,omitempty"` // 0 = none, 1 = encrypted
+	EncStatus     int    `json:"enc_status,omitempty"`
+	Hidden        bool   `json:"hidden"`
+	EnableRecycle bool   `json:"enable_recycle_bin"`
 	// DSM is inconsistent here: some firmware returns this as bool, others
 	// as int. We tolerate both via a flexBool decoder.
 	RecycleAdminOnly flexBool `json:"recycle_bin_admin_only,omitempty"`
-	Readonly       bool      `json:"is_readonly,omitempty"`
-	IsUsbShare     bool   `json:"is_usb_share,omitempty"`
-	IsSyncShare    bool   `json:"is_sync_share,omitempty"`
-	IsCloudSync    bool   `json:"is_cloudsync_share,omitempty"`
-	UUID           string `json:"uuid,omitempty"`
-	ShareQuota     int64  `json:"share_quota,omitempty"` // MB
-	ShareQuotaUsed int64  `json:"share_quota_used,omitempty"`
+	Readonly         bool     `json:"is_readonly,omitempty"`
+	IsUsbShare       bool     `json:"is_usb_share,omitempty"`
+	IsSyncShare      bool     `json:"is_sync_share,omitempty"`
+	IsCloudSync      bool     `json:"is_cloudsync_share,omitempty"`
+	UUID             string   `json:"uuid,omitempty"`
+	ShareQuota       int64    `json:"share_quota,omitempty"` // MB
+	ShareQuotaUsed   int64    `json:"share_quota_used,omitempty"`
 }
 
 // IsEncrypted is a convenience over Share.Encryption / EncStatus.

@@ -13,13 +13,13 @@ type FSEntry struct {
 	Path  string `json:"path"`
 	Type  string `json:"type,omitempty"`
 	Add   struct {
-		Size       int64  `json:"size"`
+		Size       int64     `json:"size"`
 		Owner      OwnerInfo `json:"owner,omitempty"`
-		Time       FSTime `json:"time,omitempty"`
-		Perm       FSPerm `json:"perm,omitempty"`
-		RealPath   string `json:"real_path,omitempty"`
-		Type       string `json:"type,omitempty"`
-		MountPoint string `json:"mount_point_type,omitempty"`
+		Time       FSTime    `json:"time,omitempty"`
+		Perm       FSPerm    `json:"perm,omitempty"`
+		RealPath   string    `json:"real_path,omitempty"`
+		Type       string    `json:"type,omitempty"`
+		MountPoint string    `json:"mount_point_type,omitempty"`
 	} `json:"additional"`
 }
 
@@ -41,9 +41,9 @@ type FSTime struct {
 
 // FSPerm captures filesystem permission flags.
 type FSPerm struct {
-	POSIX int    `json:"posix"`
-	AdvRight any  `json:"adv_right,omitempty"`
-	ACL  any   `json:"acl,omitempty"`
+	POSIX    int `json:"posix"`
+	AdvRight any `json:"adv_right,omitempty"`
+	ACL      any `json:"acl,omitempty"`
 }
 
 // VolumeStatus is the per-share filesystem space block returned in the
@@ -57,10 +57,10 @@ type VolumeStatus struct {
 // FileShare is one entry from SYNO.FileStation.List.list_share — the
 // roots File Station exposes (typically the shared folders).
 type FileShare struct {
-	IsDir       bool   `json:"isdir"`
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	Add         struct {
+	IsDir bool   `json:"isdir"`
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	Add   struct {
 		Owner     OwnerInfo    `json:"owner,omitempty"`
 		Time      FSTime       `json:"time,omitempty"`
 		Perm      FSPerm       `json:"perm,omitempty"`

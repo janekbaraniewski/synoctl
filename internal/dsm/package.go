@@ -12,15 +12,15 @@ import (
 // a nested `additional` object — we flatten it into the struct via
 // UnmarshalJSON so the rest of the codebase sees a flat shape.
 type Package struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Timestamp   int64  `json:"timestamp,omitempty"`
-	Status      string `json:"status,omitempty"`        // running / stop / broken
-	Maintainer  string `json:"maintainer,omitempty"`
-	Description string `json:"description,omitempty"`
-	Beta        bool   `json:"beta,omitempty"`
-	CtlUninstall bool  `json:"ctl_uninstall,omitempty"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Version      string `json:"version"`
+	Timestamp    int64  `json:"timestamp,omitempty"`
+	Status       string `json:"status,omitempty"` // running / stop / broken
+	Maintainer   string `json:"maintainer,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Beta         bool   `json:"beta,omitempty"`
+	CtlUninstall bool   `json:"ctl_uninstall,omitempty"`
 }
 
 // UnmarshalJSON pulls fields out of the nested `additional` object that

@@ -56,12 +56,12 @@ func NewApp(client *dsm.Client, theme Theme, logger *log.Logger, views ...View) 
 	pal.Placeholder = "type a view name and press enter…"
 
 	a := &App{
-		client: client,
-		theme:  theme,
-		keys:   DefaultKeys(),
-		logger: logger,
-		views:  views,
-		byName: make(map[string]View, len(views)),
+		client:  client,
+		theme:   theme,
+		keys:    DefaultKeys(),
+		logger:  logger,
+		views:   views,
+		byName:  make(map[string]View, len(views)),
 		palette: pal,
 	}
 	for _, v := range views {

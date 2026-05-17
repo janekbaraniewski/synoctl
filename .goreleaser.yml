@@ -1,0 +1,54 @@
+version: 2
+
+project_name: synoctl
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: synoctl
+    main: ./cmd/synoctl
+    binary: synoctl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/janbaraniewski/synology-ctl/internal/cli.version={{ .Version }}
+      - -X github.com/janbaraniewski/synology-ctl/internal/cli.commit={{ .Commit }}
+      - -X github.com/janbaraniewski/synology-ctl/internal/cli.date={{ .Date }}
+
+archives:
+  - id: default
+    ids:
+      - synoctl
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^chore:'
+      - '^test:'
+      - '^Merge '
