@@ -37,6 +37,7 @@ type Files struct {
 
 	detail  *dsm.FSEntry
 	confirm *Confirm
+	prompt  *Prompt
 	flash   string
 }
 
@@ -51,7 +52,7 @@ type filesListMsg struct {
 }
 
 func NewFiles(c Ctx) tui.View {
-	f := &Files{ctx: c, confirm: NewConfirm(c.Theme)}
+	f := &Files{ctx: c, confirm: NewConfirm(c.Theme), prompt: NewPrompt(c.Theme)}
 	f.initBase(c)
 	return f
 }
@@ -65,6 +66,7 @@ func (f *Files) Bindings() []key.Binding {
 		key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "up")),
 		key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "up a directory")),
 		key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "delete (with confirm)")),
+		key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "rename")),
 	)
 }
 
@@ -169,9 +171,16 @@ type filesDeleteMsg struct {
 	Path string
 	Err  error
 }
+type filesRenameMsg struct {
+	Path, NewName string
+	Err           error
+}
 
 func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 	if handled, cmd := f.confirm.Update(msg); handled {
+		return f, cmd
+	}
+	if handled, cmd := f.prompt.Update(msg); handled {
 		return f, cmd
 	}
 	switch m := msg.(type) {
@@ -185,6 +194,21 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				func(_ struct{}, err error) tea.Msg { return filesDeleteMsg{Path: pth, Err: err} },
 			)
 		}
+	case SubmittedMsg:
+		if strings.HasPrefix(m.Token, "rename:") {
+			pth := strings.TrimPrefix(m.Token, "rename:")
+			if m.Value == "" {
+				f.flash = "rename cancelled (empty name)"
+				return f, nil
+			}
+			f.flash = "renaming " + pth + " → " + m.Value + "…"
+			c := f.ctx.Client
+			newName := m.Value
+			return f, tui.Fetch(30*time.Second,
+				func(ctx context.Context) (struct{}, error) { return struct{}{}, c.FileRename(ctx, pth, newName) },
+				func(_ struct{}, err error) tea.Msg { return filesRenameMsg{Path: pth, NewName: newName, Err: err} },
+			)
+		}
 	case CancelledMsg:
 		f.flash = "cancelled"
 		return f, nil
@@ -194,7 +218,16 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		} else {
 			f.flash = "deleted " + m.Path
 		}
-		// Refresh the current view.
+		if f.currentPath == "" {
+			return f, f.fetchRoots()
+		}
+		return f, f.fetchDir(f.currentPath)
+	case filesRenameMsg:
+		if m.Err != nil {
+			f.flash = "rename failed: " + m.Err.Error()
+		} else {
+			f.flash = "renamed to " + m.NewName
+		}
 		if f.currentPath == "" {
 			return f, f.fetchRoots()
 		}
@@ -253,13 +286,23 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			}
 		}
 	}
-	if km, ok := msg.(tea.KeyMsg); ok && km.String() == "D" && f.currentPath != "" {
+	if km, ok := msg.(tea.KeyMsg); ok && f.currentPath != "" {
 		entries := f.visibleEntries()
-		if f.Cursor() < len(entries) {
-			e := entries[f.Cursor()]
-			f.confirm.Ask("delete:"+e.Path, "Delete "+e.Path+"?",
-				"This recursively removes the file or folder. There is no undo.")
-			return f, nil
+		switch km.String() {
+		case "D":
+			if f.Cursor() < len(entries) {
+				e := entries[f.Cursor()]
+				f.confirm.Ask("delete:"+e.Path, "Delete "+e.Path+"?",
+					"This recursively removes the file or folder. There is no undo.")
+				return f, nil
+			}
+		case "N":
+			if f.Cursor() < len(entries) {
+				e := entries[f.Cursor()]
+				f.prompt.Ask("rename:"+e.Path, "Rename "+e.Name,
+					"Enter a new name (path component only, no slashes):", e.Name)
+				return f, nil
+			}
 		}
 	}
 	switch m := msg.(type) {
@@ -278,6 +321,9 @@ func (f *Files) Render(width, height int) string {
 	t := f.ctx.Theme
 	if f.confirm.Open() {
 		return f.confirm.Render(width, height)
+	}
+	if f.prompt.Open() {
+		return f.prompt.Render(width, height)
 	}
 	if f.detail != nil {
 		return f.renderFileDetail(width, height, *f.detail)
@@ -337,7 +383,7 @@ func (f *Files) titleString() string {
 	if f.currentPath == "" {
 		return " 🗁  Files — pick a shared folder · ⏎ open · / filter "
 	}
-	return " 🗁  " + f.currentPath + " — ⏎ open · ⌫ up · / filter "
+	return " 🗁  " + f.currentPath + " — ⏎ open · ⌫ up · / filter · [N]ame [D]elete "
 }
 
 func (f *Files) renderShares(width, height int, title string) string {
