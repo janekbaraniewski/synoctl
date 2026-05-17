@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 )
 
-// Storage is the aggregate response from SYNO.Storage.CGI.Storage.load_info.
-// That endpoint returns volumes/pools/disks/ports/env in a single payload,
-// and it's the one DSM 7 actually keeps alive on legacy boxes like the
-// DS220j (the newer SYNO.Core.Storage.* endpoints rejected our params
-// with code 101 on this firmware).
+// Storage is SYNO.Storage.CGI.Storage.load_info — the legacy endpoint
+// is the one DSM 7 still accepts on boxes where SYNO.Core.Storage.*
+// rejects our params with code 101.
 type Storage struct {
 	Volumes      []Volume      `json:"volumes"`
 	StoragePools []StoragePool `json:"storagePools"`
@@ -20,10 +18,6 @@ type Storage struct {
 }
 
 // Volume is a logical filesystem mounted on a pool.
-//
-// Field names match the legacy CGI shape: `raidType` is camelCase here
-// (not snake_case), and the canonical id is `volume_1`/`volume_2`/… —
-// the user-visible "/volume1" path lives under VolPath.
 type Volume struct {
 	ID         string `json:"id"`          // "volume_1"
 	VolPath    string `json:"vol_path"`    // "/volume1"
@@ -90,8 +84,7 @@ type Disk struct {
 	Serial string `json:"serial,omitempty"`
 }
 
-// Storage fetches volumes/pools/disks in one call via the legacy CGI path
-// that DSM 7 still keeps wired up.
+// Storage fetches volumes/pools/disks in one call.
 func (c *Client) Storage(ctx context.Context) (*Storage, error) {
 	var raw json.RawMessage
 	if err := c.Call(ctx, "SYNO.Storage.CGI.Storage", 1, "load_info", nil, &raw); err != nil {

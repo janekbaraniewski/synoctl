@@ -6,11 +6,9 @@ import (
 	"net/url"
 )
 
-// Package describes an installed DSM application package.
-//
-// On DSM 7 every field except id/name/version/timestamp comes back under
-// a nested `additional` object — we flatten it into the struct via
-// UnmarshalJSON so the rest of the codebase sees a flat shape.
+// Package describes an installed DSM application package. Fields
+// outside id/name/version/timestamp arrive nested under `additional`;
+// UnmarshalJSON flattens them.
 type Package struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
@@ -23,8 +21,6 @@ type Package struct {
 	CtlUninstall bool   `json:"ctl_uninstall,omitempty"`
 }
 
-// UnmarshalJSON pulls fields out of the nested `additional` object that
-// DSM 7 wraps them in.
 func (p *Package) UnmarshalJSON(b []byte) error {
 	type alias Package
 	var raw struct {
@@ -60,9 +56,7 @@ func (p *Package) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Packages returns installed packages with status + metadata. We ask for
-// only the additional fields DS220j actually accepts; richer DSM builds
-// can opt-in to more by extending this list.
+// Packages returns installed packages with status + metadata.
 func (c *Client) Packages(ctx context.Context) ([]Package, error) {
 	params := url.Values{}
 	params.Set("additional", `["status","ctl_uninstall","beta","maintainer","description"]`)
@@ -80,9 +74,7 @@ func (c *Client) Packages(ctx context.Context) ([]Package, error) {
 	return resp.Packages, nil
 }
 
-// PackageUninstall removes an installed package. Some Synology packages
-// have ctl_uninstall=false and can only be uninstalled from Package
-// Center; we still try the call and let DSM surface the error.
+// PackageUninstall removes an installed package.
 func (c *Client) PackageUninstall(ctx context.Context, id string) error {
 	params := url.Values{}
 	params.Set("id", id)

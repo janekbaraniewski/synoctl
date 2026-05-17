@@ -9,10 +9,8 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// Prompt is a single-line text-input modal — the read/write counterpart
-// to Confirm. Views Ask() with a token + title + placeholder + initial
-// value; the modal emits SubmittedMsg{Token, Value} on enter or
-// CancelledMsg{Token} on esc.
+// Prompt is a single-line text-input modal. The token-routed
+// counterpart to Confirm.
 type Prompt struct {
 	theme tui.Theme
 	open  bool

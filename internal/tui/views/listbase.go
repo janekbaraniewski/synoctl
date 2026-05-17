@@ -7,15 +7,8 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// listBase is embedded by every table-driven view. It centralises the
-// keyboard handling that's identical everywhere (cursor movement, `/`
-// filter) so each view only writes the truly view-specific code: which
-// data it fetches and how rows are rendered.
-//
-// Each view manages its own structured "detail" overlay — Volumes,
-// Disks, Shares, Users, Packages, Services, Network, Logs, Files all
-// have purpose-built detail screens. We do NOT have a generic
-// JSON-inspector fallback: every entity has a curated view.
+// listBase centralises cursor movement + `/` filter for table-driven
+// views. Each view owns its own structured detail overlay.
 type listBase struct {
 	cursor int
 	filter Filter

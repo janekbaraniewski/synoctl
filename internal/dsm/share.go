@@ -5,11 +5,8 @@ import (
 	"net/url"
 )
 
-// Share is a single shared folder definition.
-//
-// Note: DSM is inconsistent about types — `encryption` arrives as 0/1 on
-// DSM 7 (not bool), and several "is_*" flags come as 0/1 too. We use int
-// for those and expose helper accessors so the UI doesn't have to know.
+// Share is a shared folder. Some flag fields arrive as 0/1 instead of
+// bool depending on firmware; flexBool tolerates both.
 type Share struct {
 	Name          string `json:"name"`
 	Path          string `json:"vol_path"`

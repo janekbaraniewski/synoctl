@@ -6,10 +6,9 @@ import (
 	"net/url"
 )
 
-// SystemInfo mirrors SYNO.Core.System info data. Field names were
-// derived from a live DS220j running DSM 7.0.1-42218 — DSM ships these
-// as `firmware_ver`/`sys_temp`/`enabled_ntp`/etc., not the names the
-// older documentation suggests.
+// SystemInfo is SYNO.Core.System.info, with the field tags DSM 7
+// actually uses (firmware_ver, sys_temp, enabled_ntp — not the names
+// the docs suggest).
 type SystemInfo struct {
 	Model           string `json:"model"`
 	Serial          string `json:"serial"`
@@ -40,9 +39,8 @@ type SystemInfo struct {
 	Build      string `json:"-"`
 }
 
-// SystemInfo returns assorted device facts. DSM 7 requires SYNO.Core.System
-// at version 3; if that's rejected we fall back to v1 (DSM 6) and then to
-// SYNO.DSM.Info (very old firmware) so this works across the fleet.
+// SystemInfo tries v3 first, then v1, then falls back to SYNO.DSM.Info
+// for old firmware.
 func (c *Client) SystemInfo(ctx context.Context) (*SystemInfo, error) {
 	for _, v := range []int{3, 1} {
 		params := url.Values{}
@@ -79,8 +77,6 @@ func (c *Client) SystemInfo(ctx context.Context) (*SystemInfo, error) {
 	}, nil
 }
 
-// secondsToDSMUptime renders a seconds count in DSM's "d:h:m:s" format so
-// downstream consumers don't need a special case for the legacy path.
 func secondsToDSMUptime(s int64) string {
 	if s <= 0 {
 		return ""

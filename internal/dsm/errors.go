@@ -16,9 +16,9 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("dsm: error code %d [api=%s method=%s]", e.Code, e.API, e.Method)
 }
 
-// Common DSM error codes. Drawn from the Synology Web API spec; the auth
-// codes (400–407) and the general codes (100–119) are the most useful at
-// runtime for surfacing friendly TUI messages.
+// Common DSM error codes (auth + generic only — per-API codes overlap
+// these numbers with different meanings, so use err.Error()'s api/method
+// context to disambiguate).
 var errorMessages = map[int]string{
 	100: "unknown error",
 	101: "no parameter of API, method or version",

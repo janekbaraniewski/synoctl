@@ -23,10 +23,8 @@ type Device struct {
 	Secure   bool     // true when discovered on https
 }
 
-// PrimaryAddr returns the best address string for connecting. The order is
-// chosen so the result is something a user can actually type into a browser
-// or pass to dsm.New: routable IPv4 first, then mDNS hostname (resolvers
-// handle .local), then routable IPv6, then anything else as a fallback.
+// PrimaryAddr returns the address to connect to: routable IPv4 first,
+// then the mDNS hostname, then routable IPv6, then anything else.
 func (d Device) PrimaryAddr() string {
 	for _, ip := range d.IPv4 {
 		if !ip.IsLinkLocalUnicast() {
@@ -50,9 +48,8 @@ func (d Device) PrimaryAddr() string {
 	return ""
 }
 
-// Services we probe. DSM 7 reliably advertises on _http._tcp and _https._tcp;
-// other Synology services (_smb, _afpovertcp) are used as fallbacks to surface
-// devices when the web service is somehow filtered.
+// Services we probe — _http/_https are the primary advertisements,
+// _smb/_afp are fallbacks for boxes that filter the web service.
 var probeServices = []struct {
 	name   string
 	secure bool

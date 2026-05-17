@@ -16,17 +16,8 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// StoragePage is the unified storage management view. Everything you'd
-// want to inspect or act on across the storage stack — volumes, disks,
-// shared folders, the files inside them — lives on a single
-// scrollable screen.
-//
-// Navigation: j/k (or ↑/↓) moves the cursor through every entry; the
-// cursor skips section headers automatically. Enter drills into the
-// selected entry — the existing per-entity detail renderers
-// (renderVolumeDetail, renderDiskDetail, …) provide the inspector. For
-// shared folders, Enter drops you into a focused file-browser mode at
-// that share's path; ⌫ steps back out.
+// StoragePage is the unified storage view: volumes, disks, shares, and
+// the file browser on one scrollable surface.
 type StoragePage struct {
 	ctx Ctx
 
@@ -441,11 +432,8 @@ func (s *StoragePage) drillDown() tea.Cmd {
 		d := s.filterDisks()[r.index]
 		s.detailDisk = &d
 	case rowShare:
-		// FileStation paths are share-rooted: /<share-name>. The share
-		// struct's `Path` field is actually the volume mount (vol_path,
-		// "/volume1") which is NOT a valid FileStation path and yields
-		// error 408 ("no such file or directory" in FileStation's
-		// error namespace).
+		// FileStation paths are share-rooted; share.Path is vol_path,
+		// which isn't a valid FileStation path.
 		sh := s.filterShares()[r.index]
 		s.stack = append(s.stack, s.filePath)
 		s.filePath = "/" + sh.Name

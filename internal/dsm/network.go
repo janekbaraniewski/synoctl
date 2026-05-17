@@ -4,9 +4,7 @@ import (
 	"context"
 )
 
-// NetworkInterface is a single NIC reported by DSM. DSM 7 returns a thin
-// set of fields by default and ignores `additional` requests on legacy
-// boxes, so we model only what actually arrives.
+// NetworkInterface is one row from SYNO.Core.Network.Interface list.
 type NetworkInterface struct {
 	Name    string `json:"name,omitempty"`
 	IFName  string `json:"ifname"` // eth0, bond0, pppoe

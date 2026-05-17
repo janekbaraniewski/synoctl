@@ -1,8 +1,4 @@
 // Package dsm is a typed client for the Synology DSM Web API.
-//
-// All requests in DSM 7 route through /webapi/entry.cgi. DSM 5/6 used
-// per-feature .cgi paths and SYNO.API.Info exposed the right path for
-// each API; we keep the path-table behaviour so older boxes still work.
 package dsm
 
 import (
@@ -122,10 +118,6 @@ type envelope struct {
 
 // Call performs a DSM API request and decodes the data field into out.
 // Pass nil for out to discard the response body.
-//
-// The path is resolved via SYNO.API.Info on first use; everything is routed
-// through entry.cgi as a fallback when the API isn't in the info table, which
-// covers DSM 7 where almost every endpoint shares entry.cgi.
 func (c *Client) Call(ctx context.Context, api string, version int, method string, params url.Values, out any) error {
 	if params == nil {
 		params = url.Values{}
@@ -141,9 +133,7 @@ func (c *Client) Call(ctx context.Context, api string, version int, method strin
 	endpoint := *c.baseURL
 	endpoint.Path = path
 
-	// Use POST so long parameter lists (e.g. selected user ids) don't blow
-	// past URL length limits, and so password-like params never end up in
-	// proxy access logs as a query string.
+	// POST keeps long param lists / passwords out of URLs.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(params.Encode()))
 	if err != nil {
 		return err

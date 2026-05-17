@@ -14,11 +14,7 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// AppsPage is the unified package + service management view. Packages
-// (installed DSM apps) and services (system-level toggles like SMB,
-// SSH, NTP) share the page; the cursor moves through both, and the
-// per-entity actions (`s`/`x`/`R`/`U` for packages, `e`/`d` for
-// services) act on whichever row is selected.
+// AppsPage shows installed packages and system services on one screen.
 type AppsPage struct {
 	ctx Ctx
 

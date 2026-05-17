@@ -30,13 +30,8 @@ func Plain(s string) Cell { return Cell{Text: s} }
 // Styled wraps text into a Cell with a style override (e.g. a chip).
 func Styled(s string, st lipgloss.Style) Cell { return Cell{Text: s, Style: st, HasStyle: true} }
 
-// Table renders a complete table widget for use inside a card. It draws:
-//   - one header row in the accent colour
-//   - zebra-striped body rows
-//   - the row at `selected` highlighted (-1 to disable)
-//
-// Width is the total interior width available; columns with Width=0 split
-// the remaining space evenly after the explicit widths are subtracted.
+// Table renders a header + body table. Width=0 columns share remaining
+// space evenly. Pass selected=-1 to disable row highlight.
 func Table(theme tui.Theme, width, height int, cols []Column, rows [][]Cell, selected int) string {
 	widths := computeWidths(cols, width)
 
@@ -47,11 +42,7 @@ func Table(theme tui.Theme, width, height int, cols []Column, rows [][]Cell, sel
 	b.WriteString(lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", width)))
 	b.WriteByte('\n')
 
-	// Body. We deliberately avoid zebra striping: when the table contains
-	// per-cell chip styles (status, level …) the alternating-row
-	// background fights the chip background and ends up looking like
-	// ugly horizontal bars. A single calm foreground for unselected rows
-	// plus a strong highlight on the selected row reads much cleaner.
+	// No zebra striping: alt-row backgrounds fight per-cell chip colors.
 	maxRows := height - 3
 	if maxRows < 1 {
 		maxRows = 1
@@ -165,12 +156,8 @@ func computeWidths(cols []Column, total int) []int {
 	return widths
 }
 
-// clipTo truncates s to fit `w` visible columns. It is ANSI-aware:
-// rune-slicing a string that already contains ANSI escape sequences cuts
-// through the middle of an escape, producing garbage. ansi.Truncate
-// counts only visible columns. We keep the legacy rune-fallback for the
-// extremely unlikely case where lipgloss reports width <= w but the
-// string still has more runes than w (multi-codepoint glyphs).
+// clipTo truncates s to fit w visible columns. ANSI-aware: rune-slicing
+// a styled string cuts through escape sequences and corrupts output.
 func clipTo(s string, w int) string {
 	if w <= 0 {
 		return ""
@@ -179,7 +166,6 @@ func clipTo(s string, w int) string {
 		return s
 	}
 	if !strings.ContainsRune(s, 0x1b) {
-		// Plain text — rune-level truncation is correct and faster.
 		r := []rune(s)
 		if len(r) <= w {
 			return s
@@ -188,4 +174,3 @@ func clipTo(s string, w int) string {
 	}
 	return ansi.Truncate(s, w-1, "") + "…"
 }
-

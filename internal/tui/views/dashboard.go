@@ -15,16 +15,8 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// Dashboard is the live overview. Layout from top to bottom:
-//
-//	┌─ metrics row (CPU · Memory · Network · Disk I/O) — fixed height ──┐
-//	├─ volumes — variable height (one row per volume) ──────────────────┤
-//	├─ disks — fixed height (chips) ────────────────────────────────────┤
-//	├─ bottom row (top processes · recent activity) — fills remainder ──┤
-//	└────────────────────────────────────────────────────────────────────┘
-//
-// Every panel is a rounded card. The bottom row stretches to consume any
-// remaining body height so we never leave a giant black void.
+// Dashboard is the live overview: CPU / Memory / Network / Disk I/O
+// cards, volume bars, disk strip, top processes, and recent activity.
 type Dashboard struct {
 	ctx Ctx
 

@@ -5,20 +5,15 @@ import (
 	"net/url"
 )
 
-// Service is a system-level service (SMB, AFP, SSH, …) reported by DSM.
-//
-// Field names match SYNO.Core.Service v3 get: `service_id` is the stable
-// identifier, `enable_status` is "enabled" / "disabled" / "static"
-// ("static" means the service runs unconditionally and can't be toggled).
+// Service is one row from SYNO.Core.Service v3 get.
 type Service struct {
 	ID                    string `json:"service_id"`
 	DisplayNameSectionKey string `json:"display_name_section_key"`
 	EnableStatus          string `json:"enable_status"`
 }
 
-// DisplayName returns a human label for the service. DSM ships the real
-// names in i18n bundles only, so we map the well-known ids to friendly
-// strings and fall back to the id (or section key) for anything else.
+// DisplayName maps well-known service ids to friendly strings; the
+// official names live in DSM's i18n bundles only.
 func (s Service) DisplayName() string {
 	if name, ok := serviceFriendlyNames[s.ID]; ok {
 		return name

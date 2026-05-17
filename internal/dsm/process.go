@@ -4,10 +4,8 @@ import (
 	"context"
 )
 
-// Process is one entry from SYNO.Core.System.Process.list.
-//
-// CPU is reported in ticks (DSM's internal counter — not a percentage of
-// total CPU), so it's only useful in relative form. Mem is RSS in KiB.
+// Process is one entry from SYNO.Core.System.Process.list. CPU is in
+// internal ticks (only meaningful relatively); Mem is RSS in KiB.
 type Process struct {
 	PID       int    `json:"pid"`
 	Command   string `json:"command"`
@@ -17,8 +15,7 @@ type Process struct {
 	Status    string `json:"status"`     // R / S / D / Z …
 }
 
-// Processes returns the current process list. The list is fetched in
-// whatever order DSM returns it — the caller should sort to taste.
+// Processes returns the current process list.
 func (c *Client) Processes(ctx context.Context) ([]Process, error) {
 	var resp struct {
 		Process []Process `json:"process"`

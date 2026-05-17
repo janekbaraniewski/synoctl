@@ -14,11 +14,8 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// AdminPage is the unified "everything DSM-level" view. The top of the
-// page is a compact system info strip (model/serial/DSM/uptime/temp);
-// below that the cursor moves through Users, Network interfaces and
-// recent log entries — all visible at once. Reboot and shutdown remain
-// page-level actions (capital B / S, both confirm).
+// AdminPage shows system info, users, network interfaces, and recent
+// log entries on one screen. B / S trigger reboot / shutdown (confirmed).
 type AdminPage struct {
 	ctx Ctx
 

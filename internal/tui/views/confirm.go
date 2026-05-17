@@ -8,10 +8,8 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// Confirm is a small modal that asks the user to confirm a destructive
-// action. It captures input while open and emits a ConfirmedMsg with the
-// stable token the caller supplied so a single view can host multiple
-// confirmations without an ambiguous callback.
+// Confirm is a yes/no modal. The token lets one view host several
+// distinct confirmations.
 type Confirm struct {
 	theme   tui.Theme
 	open    bool

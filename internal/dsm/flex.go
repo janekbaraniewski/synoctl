@@ -5,14 +5,10 @@ import (
 	"strconv"
 )
 
-// flexBool decodes a JSON value that DSM might send as either a JSON
-// boolean (true/false) or a JSON number (0/1) or the string "true"/"false"/"0"/"1".
-// Several DSM endpoints disagree about which encoding to use for the
-// same field across firmware versions, so we accept all three rather
-// than break on the inconsistency.
+// flexBool decodes a JSON bool, number (0/1), or string ("true"/"1"/"yes")
+// — DSM uses all three across firmware versions for the same field.
 type flexBool bool
 
-// UnmarshalJSON implements json.Unmarshaler.
 func (b *flexBool) UnmarshalJSON(data []byte) error {
 	data = bytes.TrimSpace(data)
 	if len(data) == 0 || string(data) == "null" {
@@ -49,6 +45,4 @@ func (b *flexBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Bool returns the underlying bool, convenient for callers that don't
-// want to leak the flexBool type out of the package.
 func (b flexBool) Bool() bool { return bool(b) }
