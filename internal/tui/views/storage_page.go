@@ -3,7 +3,10 @@ package views
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -63,6 +66,7 @@ func (s *StoragePage) Bindings() []key.Binding {
 		key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "leave file browser")),
 		key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "delete file (confirm)")),
 		key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "rename file")),
+		key.NewBinding(key.WithKeys("W"), key.WithHelp("W", "download to local disk")),
 	)
 }
 
@@ -226,6 +230,12 @@ type spRenameMsg struct {
 	Path, NewName string
 	Err           error
 }
+type spDownloadMsg struct {
+	RemotePath string
+	LocalPath  string
+	Bytes      int64
+	Err        error
+}
 
 // ───────────────────────── update ─────────────────────────
 
@@ -268,6 +278,24 @@ func (s *StoragePage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				func(_ struct{}, err error) tea.Msg { return spRenameMsg{Path: pth, NewName: newName, Err: err} },
 			)
 		}
+		if rest, ok := strings.CutPrefix(m.Token, "download:"); ok {
+			if m.Value == "" {
+				s.flash = "download cancelled (empty path)"
+				return s, nil
+			}
+			c := s.ctx.Client
+			remote := rest
+			local := expandHome(m.Value)
+			s.flash = "downloading " + remote + " → " + local + "…"
+			return s, tui.Fetch(10*time.Minute,
+				func(ctx context.Context) (int64, error) {
+					return downloadToFile(ctx, c, remote, local)
+				},
+				func(n int64, err error) tea.Msg {
+					return spDownloadMsg{RemotePath: remote, LocalPath: local, Bytes: n, Err: err}
+				},
+			)
+		}
 	case CancelledMsg:
 		s.flash = "cancelled"
 		return s, nil
@@ -288,6 +316,12 @@ func (s *StoragePage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		}
 		if s.filePath != "" {
 			return s, s.fetchFiles(s.filePath)
+		}
+	case spDownloadMsg:
+		if m.Err != nil {
+			s.flash = "download failed: " + m.Err.Error()
+		} else {
+			s.flash = "downloaded " + m.RemotePath + " → " + m.LocalPath + " (" + humanize.IBytes(uint64(m.Bytes)) + ")"
 		}
 	}
 
@@ -389,9 +423,50 @@ func (s *StoragePage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				s.prompt.Ask("rename:"+e.Path, "Rename "+e.Name,
 					"Enter a new name (path component only):", e.Name)
 			}
+		case "W":
+			if r, ok := s.currentRow(); ok && r.kind == rowFile {
+				e := s.filterFiles()[r.index]
+				if e.IsDir {
+					s.flash = "downloads are for files only (folders need an archive — not wired yet)"
+					return s, nil
+				}
+				suggested := "~/Downloads/" + e.Name
+				s.prompt.Ask("download:"+e.Path, "Download "+e.Name,
+					"Save to (use ~ for $HOME):", suggested)
+			}
 		}
 	}
 	return s, nil
+}
+
+// expandHome turns a leading ~ into $HOME so users can type the path
+// the way they're used to in a shell.
+func expandHome(p string) string {
+	if strings.HasPrefix(p, "~") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, strings.TrimPrefix(p, "~"))
+		}
+	}
+	return p
+}
+
+// downloadToFile streams a FileStation download into a local path,
+// creating parent dirs and returning the byte count written.
+func downloadToFile(ctx context.Context, c *dsm.Client, remote, local string) (int64, error) {
+	if err := os.MkdirAll(filepath.Dir(local), 0o755); err != nil {
+		return 0, err
+	}
+	rc, _, err := c.FileDownload(ctx, remote)
+	if err != nil {
+		return 0, err
+	}
+	defer rc.Close()
+	f, err := os.Create(local)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	return io.Copy(f, rc)
 }
 
 func (s *StoragePage) maybeRefreshFiles() tea.Cmd {
@@ -605,7 +680,7 @@ func (s *StoragePage) composeSections(width int, rows []row) []string {
 
 	out = append(out, "")
 	out = append(out, lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"  ↑/↓ move · ⏎ open share / drill in · / filter · ⌫ leave file browser · D delete · N rename"))
+		"  ↑/↓ move · ⏎ open share / drill in · / filter · ⌫ leave file browser · W download · D delete · N rename"))
 	return out
 }
 

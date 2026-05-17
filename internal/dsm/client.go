@@ -106,6 +106,58 @@ func (c *Client) SID() string {
 // Authenticated reports whether a SID is in place.
 func (c *Client) Authenticated() bool { return c.SID() != "" }
 
+// RawCall issues a DSM request and returns the response body as a stream
+// instead of parsing the JSON envelope. Used for endpoints that return
+// binary payloads (file download, image previews).
+//
+// Caller is responsible for closing the returned ReadCloser.
+func (c *Client) RawCall(ctx context.Context, api string, version int, method string, params url.Values) (io.ReadCloser, string, error) {
+	if params == nil {
+		params = url.Values{}
+	}
+	params.Set("api", api)
+	params.Set("version", strconv.Itoa(version))
+	params.Set("method", method)
+	if sid := c.SID(); sid != "" {
+		params.Set("_sid", sid)
+	}
+	endpoint := *c.baseURL
+	endpoint.Path = c.pathFor(api)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(params.Encode()))
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if tok := c.token(); tok != "" {
+		req.Header.Set("X-SYNO-TOKEN", tok)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	if resp.StatusCode/100 != 2 {
+		resp.Body.Close()
+		return nil, "", fmt.Errorf("dsm: %s.%s: http %d", api, method, resp.StatusCode)
+	}
+	// DSM returns a JSON envelope (not binary) when the request itself
+	// fails — sniff the Content-Type and surface as a typed error.
+	if ct := resp.Header.Get("Content-Type"); strings.Contains(ct, "application/json") {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		var env envelope
+		if err := json.Unmarshal(body, &env); err == nil && !env.Success {
+			code := 0
+			if env.Error != nil {
+				code = env.Error.Code
+			}
+			return nil, "", &Error{Code: code, API: api, Method: method}
+		}
+		return nil, "", fmt.Errorf("dsm: %s.%s: unexpected JSON response", api, method)
+	}
+	return resp.Body, resp.Header.Get("Content-Disposition"), nil
+}
+
 // envelope mirrors the standard DSM response wrapper.
 type envelope struct {
 	Success bool            `json:"success"`

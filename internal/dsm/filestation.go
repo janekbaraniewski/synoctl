@@ -2,6 +2,7 @@ package dsm
 
 import (
 	"context"
+	"io"
 	"net/url"
 	"strconv"
 )
@@ -83,6 +84,16 @@ func (c *Client) FileShares(ctx context.Context) ([]FileShare, error) {
 		return nil, err
 	}
 	return resp.Shares, nil
+}
+
+// FileDownload streams a file from FileStation. The caller closes the
+// reader. Returns the raw stream — Content-Disposition is exposed
+// separately for callers that want the server's suggested filename.
+func (c *Client) FileDownload(ctx context.Context, path string) (rc io.ReadCloser, contentDisposition string, err error) {
+	params := url.Values{}
+	params.Set("path", `["`+path+`"]`)
+	params.Set("mode", "download")
+	return c.RawCall(ctx, "SYNO.FileStation.Download", 2, "download", params)
 }
 
 // FileDelete deletes a single file or directory. Path must be the
