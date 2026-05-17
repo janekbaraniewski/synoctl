@@ -44,11 +44,21 @@ checksum:
 snapshot:
   version_template: "{{ .Version }}-next"
 
+# Release body comes from the annotated-tag message (curated by hand
+# per release). The auto-generated SHA-prefixed changelog is suppressed.
+release:
+  header: |
+    {{ .TagContents }}
+  footer: |
+
+    ## Install
+
+    ```bash
+    brew tap janekbaraniewski/tap
+    brew install synoctl
+    ```
+
+    Or download a prebuilt binary from the assets below.
+
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^chore:'
-      - '^test:'
-      - '^Merge '
+  disable: true
