@@ -34,6 +34,10 @@ type Files struct {
 	entries []dsm.FSEntry
 	total   int
 	err     error
+
+	detail  *dsm.FSEntry
+	confirm *Confirm
+	flash   string
 }
 
 type filesSharesMsg struct {
@@ -47,7 +51,7 @@ type filesListMsg struct {
 }
 
 func NewFiles(c Ctx) tui.View {
-	f := &Files{ctx: c}
+	f := &Files{ctx: c, confirm: NewConfirm(c.Theme)}
 	f.initBase(c)
 	return f
 }
@@ -60,6 +64,7 @@ func (f *Files) Bindings() []key.Binding {
 	return append(BaseBindings(),
 		key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "up")),
 		key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "up a directory")),
+		key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "delete (with confirm)")),
 	)
 }
 
@@ -160,7 +165,57 @@ func (f *Files) rowCount() int {
 	return len(f.visibleEntries())
 }
 
+type filesDeleteMsg struct {
+	Path string
+	Err  error
+}
+
 func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
+	if handled, cmd := f.confirm.Update(msg); handled {
+		return f, cmd
+	}
+	switch m := msg.(type) {
+	case ConfirmedMsg:
+		if strings.HasPrefix(m.Token, "delete:") {
+			pth := strings.TrimPrefix(m.Token, "delete:")
+			f.flash = "deleting " + pth + "…"
+			c := f.ctx.Client
+			return f, tui.Fetch(30*time.Second,
+				func(ctx context.Context) (struct{}, error) { return struct{}{}, c.FileDelete(ctx, pth, true) },
+				func(_ struct{}, err error) tea.Msg { return filesDeleteMsg{Path: pth, Err: err} },
+			)
+		}
+	case CancelledMsg:
+		f.flash = "cancelled"
+		return f, nil
+	case filesDeleteMsg:
+		if m.Err != nil {
+			f.flash = "delete failed: " + m.Err.Error()
+		} else {
+			f.flash = "deleted " + m.Path
+		}
+		// Refresh the current view.
+		if f.currentPath == "" {
+			return f, f.fetchRoots()
+		}
+		return f, f.fetchDir(f.currentPath)
+	}
+	// Detail screen handling — esc closes.
+	if f.detail != nil {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			switch km.String() {
+			case "esc", "q":
+				f.detail = nil
+				return f, nil
+			case "D":
+				p := f.detail.Path
+				f.confirm.Ask("delete:"+p, "Delete "+p+"?",
+					"This recursively removes the file or folder. There is no undo.")
+				return f, nil
+			}
+		}
+		return f, nil
+	}
 	if cmd, handled := f.HandleKey(msg, f.rowCount()); handled {
 		return f, cmd
 	}
@@ -192,7 +247,19 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				if e.IsDir {
 					return f, f.NavigateTo(e.Path)
 				}
+				// File: open inspector.
+				f.detail = &e
+				return f, nil
 			}
+		}
+	}
+	if km, ok := msg.(tea.KeyMsg); ok && km.String() == "D" && f.currentPath != "" {
+		entries := f.visibleEntries()
+		if f.Cursor() < len(entries) {
+			e := entries[f.Cursor()]
+			f.confirm.Ask("delete:"+e.Path, "Delete "+e.Path+"?",
+				"This recursively removes the file or folder. There is no undo.")
+			return f, nil
 		}
 	}
 	switch m := msg.(type) {
@@ -209,6 +276,12 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 
 func (f *Files) Render(width, height int) string {
 	t := f.ctx.Theme
+	if f.confirm.Open() {
+		return f.confirm.Render(width, height)
+	}
+	if f.detail != nil {
+		return f.renderFileDetail(width, height, *f.detail)
+	}
 	title := f.titleString()
 	if f.err != nil {
 		return Card(t, width, title, "\n"+errLine(t, f.err)+"\n", true)
@@ -217,6 +290,47 @@ func (f *Files) Render(width, height int) string {
 		return f.renderShares(width, height, title)
 	}
 	return f.renderEntries(width, height, title)
+}
+
+// renderFileDetail draws the per-file inspector with size + ownership +
+// timestamps + permissions.
+func (f *Files) renderFileDetail(width, _ int, e dsm.FSEntry) string {
+	t := f.ctx.Theme
+	parts := []string{
+		hero(t, width, "📄", e.Name, "", e.Path),
+	}
+	size := "(folder)"
+	if !e.IsDir {
+		size = humanize.IBytes(uint64(e.Add.Size))
+	}
+	props := [][2]string{
+		{"Path", e.Path},
+		{"Size", size},
+		{"Type", coalesce(e.Type, e.Add.Type)},
+		{"Owner", e.Add.Owner.User},
+		{"Group", e.Add.Owner.Group},
+		{"POSIX perms", fmt.Sprintf("%o", e.Add.Perm.POSIX)},
+		{"Real path", e.Add.RealPath},
+	}
+	if e.Add.Time.Mtime > 0 {
+		props = append(props, [2]string{"Modified", time.Unix(e.Add.Time.Mtime, 0).Format("2006-01-02 15:04:05")})
+	}
+	if e.Add.Time.Atime > 0 {
+		props = append(props, [2]string{"Accessed", time.Unix(e.Add.Time.Atime, 0).Format("2006-01-02 15:04:05")})
+	}
+	if e.Add.Time.Ctime > 0 {
+		props = append(props, [2]string{"Changed", time.Unix(e.Add.Time.Ctime, 0).Format("2006-01-02 15:04:05")})
+	}
+	if e.Add.Time.Crtime > 0 {
+		props = append(props, [2]string{"Created", time.Unix(e.Add.Time.Crtime, 0).Format("2006-01-02 15:04:05")})
+	}
+	parts = append(parts, propsCard(t, width, " Properties ", props))
+	parts = append(parts,
+		noteCard(t, width, "  esc to go back · D to delete (asks for confirmation)"))
+	if f.flash != "" {
+		parts = append(parts, noteCard(t, width, "  "+f.flash))
+	}
+	return strings.Join(parts, "\n")
 }
 
 func (f *Files) titleString() string {

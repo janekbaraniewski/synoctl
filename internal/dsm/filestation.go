@@ -85,6 +85,27 @@ func (c *Client) FileShares(ctx context.Context) ([]FileShare, error) {
 	return resp.Shares, nil
 }
 
+// FileDelete deletes a single file or directory. Path must be the
+// absolute DSM path (e.g. /volume1/photos/foo.jpg). `recursive` is
+// required for non-empty directories.
+func (c *Client) FileDelete(ctx context.Context, path string, recursive bool) error {
+	params := url.Values{}
+	params.Set("path", `["`+path+`"]`)
+	if recursive {
+		params.Set("recursive", "true")
+	}
+	return c.Call(ctx, "SYNO.FileStation.Delete", 2, "delete", params, nil)
+}
+
+// FileRename renames a file in place. newName is the final path component
+// (not a full path).
+func (c *Client) FileRename(ctx context.Context, path, newName string) error {
+	params := url.Values{}
+	params.Set("path", `["`+path+`"]`)
+	params.Set("name", `["`+newName+`"]`)
+	return c.Call(ctx, "SYNO.FileStation.Rename", 2, "rename", params, nil)
+}
+
 // ListFiles lists the contents of a folder. Path is the DSM-style
 // absolute path (e.g. /volume1/photos). The result is a slice of FSEntry
 // with size + timestamps populated.
