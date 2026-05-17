@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
@@ -164,6 +165,12 @@ func computeWidths(cols []Column, total int) []int {
 	return widths
 }
 
+// clipTo truncates s to fit `w` visible columns. It is ANSI-aware:
+// rune-slicing a string that already contains ANSI escape sequences cuts
+// through the middle of an escape, producing garbage. ansi.Truncate
+// counts only visible columns. We keep the legacy rune-fallback for the
+// extremely unlikely case where lipgloss reports width <= w but the
+// string still has more runes than w (multi-codepoint glyphs).
 func clipTo(s string, w int) string {
 	if w <= 0 {
 		return ""
@@ -171,9 +178,14 @@ func clipTo(s string, w int) string {
 	if lipgloss.Width(s) <= w {
 		return s
 	}
-	r := []rune(s)
-	if len(r) <= w {
-		return s
+	if !strings.ContainsRune(s, 0x1b) {
+		// Plain text — rune-level truncation is correct and faster.
+		r := []rune(s)
+		if len(r) <= w {
+			return s
+		}
+		return string(r[:w-1]) + "…"
 	}
-	return string(r[:w-1]) + "…"
+	return ansi.Truncate(s, w-1, "") + "…"
 }
+

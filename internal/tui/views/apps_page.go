@@ -374,12 +374,15 @@ func (a *AppsPage) renderServiceRow(s dsm.Service, highlight bool) string {
 }
 
 // sectionHeader renders a "title (n) ───────" header used by every page.
+// The rule uses the strong-border accent rather than the soft one so it
+// reads as a real divider on dark terminals, not just a barely-visible
+// smudge.
 func sectionHeader(t tui.Theme, width int, title string, count int, err error) string {
 	left := t.Title().Render(title) + " " +
 		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("(%d)", count))
 	leftW := lipgloss.Width(left)
 	rule := strings.Repeat("─", maxInt(width-leftW-4, 0))
-	out := left + "  " + lipgloss.NewStyle().Foreground(t.Border).Render(rule)
+	out := left + "  " + lipgloss.NewStyle().Foreground(t.Accent).Faint(true).Render(rule)
 	if err != nil {
 		out += "\n" + errLine(t, err)
 	}

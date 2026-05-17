@@ -441,11 +441,15 @@ func (s *StoragePage) drillDown() tea.Cmd {
 		d := s.filterDisks()[r.index]
 		s.detailDisk = &d
 	case rowShare:
-		// Enter on a share starts the file browser at that share's path.
+		// FileStation paths are share-rooted: /<share-name>. The share
+		// struct's `Path` field is actually the volume mount (vol_path,
+		// "/volume1") which is NOT a valid FileStation path and yields
+		// error 408 ("no such file or directory" in FileStation's
+		// error namespace).
 		sh := s.filterShares()[r.index]
 		s.stack = append(s.stack, s.filePath)
-		s.filePath = sh.Path
-		return s.fetchFiles(sh.Path)
+		s.filePath = "/" + sh.Name
+		return s.fetchFiles(s.filePath)
 	case rowFile:
 		e := s.filterFiles()[r.index]
 		if e.IsDir {

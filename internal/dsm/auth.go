@@ -25,8 +25,8 @@ type LoginResponse struct {
 	Account   string `json:"account,omitempty"`
 }
 
-// Login authenticates the client. On success, SID/synotoken are stored and
-// subsequent calls are authorised automatically.
+// Login authenticates the client and stores the resulting SID + CSRF
+// token. Subsequent Call()s are then authorised automatically.
 func (c *Client) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
 	session := req.SessionName
 	if session == "" {
