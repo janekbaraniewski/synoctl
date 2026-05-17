@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -13,7 +14,10 @@ import (
 )
 
 func newDiscoverCmd() *cobra.Command {
-	var timeout time.Duration
+	var (
+		timeout time.Duration
+		pick    bool
+	)
 	cmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Scan the local network for Synology NAS devices via mDNS",
@@ -21,13 +25,25 @@ func newDiscoverCmd() *cobra.Command {
 
 Scans _http._tcp, _https._tcp, _smb._tcp and _afpovertcp._tcp for records
 matching Synology's vendor metadata or hostname conventions (DiskStation,
-RackStation, DS#####, RS#####). Results are de-duplicated by IP.`,
+RackStation, DS#####, RS#####). Results are de-duplicated by IP.
+
+Use --pick to choose specific network interfaces (Wi-Fi, Ethernet, VPN,
+WireGuard, Tailscale, …) — useful when your NAS sits behind a VPN.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout+time.Second)
 			defer cancel()
 
+			var ifaces []*net.Interface
+			if pick {
+				picked, err := pickInterfaces()
+				if err != nil {
+					return err
+				}
+				ifaces = picked
+			}
+
 			fmt.Printf("Scanning for Synology devices (%.0fs)…\n\n", timeout.Seconds())
-			devices, err := discover.Scan(ctx, timeout)
+			devices, err := discover.ScanInterfaces(ctx, timeout, ifaces)
 			if err != nil {
 				return err
 			}
@@ -63,6 +79,7 @@ RackStation, DS#####, RS#####). Results are de-duplicated by IP.`,
 		},
 	}
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "scan duration")
+	cmd.Flags().BoolVar(&pick, "pick", false, "interactively pick which network interfaces to scan")
 	return cmd
 }
 

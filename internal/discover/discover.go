@@ -65,10 +65,17 @@ type keyed struct {
 	dev Device
 }
 
-// Scan performs an mDNS browse across known service types and returns
-// devices that look like Synology NAS units. The scan stops at the deadline
-// or when ctx is cancelled.
+// Scan browses every interface on the host. Equivalent to
+// ScanInterfaces(ctx, timeout, nil).
 func Scan(ctx context.Context, timeout time.Duration) ([]Device, error) {
+	return ScanInterfaces(ctx, timeout, nil)
+}
+
+// ScanInterfaces browses for Synology devices, binding zeroconf to the
+// interfaces in `ifaces`. Pass nil/empty for the default (all
+// interfaces). Useful when a host has multiple networks (VPNs, Wi-Fi,
+// LAN) and the user wants to scan only specific ones.
+func ScanInterfaces(ctx context.Context, timeout time.Duration, ifaces []*net.Interface) ([]Device, error) {
 	scanCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -79,7 +86,7 @@ func Scan(ctx context.Context, timeout time.Duration) ([]Device, error) {
 		wg.Add(1)
 		go func(name string, secure bool) {
 			defer wg.Done()
-			browseOne(scanCtx, name, secure, collect)
+			browseOne(scanCtx, name, secure, ifaces, collect)
 		}(svc.name, svc.secure)
 	}
 	go func() { wg.Wait(); close(collect) }()
@@ -104,8 +111,19 @@ func Scan(ctx context.Context, timeout time.Duration) ([]Device, error) {
 	return out, nil
 }
 
-func browseOne(ctx context.Context, service string, secure bool, sink chan<- keyed) {
-	resolver, err := zeroconf.NewResolver(nil)
+func browseOne(ctx context.Context, service string, secure bool, ifaces []*net.Interface, sink chan<- keyed) {
+	var opts []zeroconf.ClientOption
+	if len(ifaces) > 0 {
+		// zeroconf takes a flat []net.Interface (not pointers).
+		flat := make([]net.Interface, 0, len(ifaces))
+		for _, p := range ifaces {
+			if p != nil {
+				flat = append(flat, *p)
+			}
+		}
+		opts = append(opts, zeroconf.SelectIfaces(flat))
+	}
+	resolver, err := zeroconf.NewResolver(opts...)
 	if err != nil {
 		return
 	}

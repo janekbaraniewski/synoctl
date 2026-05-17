@@ -26,15 +26,24 @@ import (
 func Onboard(ctx context.Context, cfg *config.Config) (*config.Profile, error) {
 	banner()
 
-	// 1. Scan for devices with a spinner so it never feels like a hang.
+	// 1. If the host has more than one usable interface (VPNs, multiple
+	//    LANs), ask the user which to scan. mDNS doesn't always cross
+	//    those boundaries — picking the right one matters when the NAS
+	//    is behind a VPN.
+	ifaces, err := pickInterfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Scan for devices on the selected interfaces.
 	var devices []discover.Device
 	scanErr := spinner.New().
 		Type(spinner.Line).
-		Title("  Scanning the local network for Synology devices…").
+		Title("  Scanning for Synology devices…").
 		Action(func() {
 			scanCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 			defer cancel()
-			devices, _ = discover.Scan(scanCtx, 7*time.Second)
+			devices, _ = discover.ScanInterfaces(scanCtx, 7*time.Second, ifaces)
 		}).
 		Run()
 	if scanErr != nil {
