@@ -716,6 +716,81 @@ var demoActiveBackupVersions = []map[string]any{
 	{"version_id": 4000, "task_id": 11, "time": time.Now().Add(-72 * time.Hour).Unix(), "size": 1_540_412_416, "status": "complete"},
 }
 
+// — cloud sync —
+//
+// Four plausible connections so the view exercises every state +
+// provider mapping path: a healthy Dropbox bidirectional sync that
+// just finished, a Google Drive download-only mirror that ran
+// yesterday, an S3 upload-only archive that ran last week, and a
+// OneDrive task currently in an error state with a stale last_sync.
+
+var demoCloudSyncTasks = []map[string]any{
+	{
+		"id":             101,
+		"display_name":   "Dropbox · /cloud-sync",
+		"link_type":      0, // Dropbox
+		"link_status":    "connected",
+		"current_status": "Up to date",
+		"local_path":     "/volume1/cloud-sync",
+		"link_remote":    "/Apps/SynologyCloudSync",
+		"username":       "jan@example.com",
+		"account_id":     "dbid:AAAA-demo-1",
+		"direction":      0, // bidirectional
+		"last_sync_time": time.Now().Add(-7 * time.Minute).Unix(),
+		"total_size":     412_408_320_000, // ~384 GiB
+		"error_count":    0,
+		"enabled":        true,
+	},
+	{
+		"id":             102,
+		"display_name":   "Google Drive · /gdrive-mirror",
+		"link_type":      1, // Google Drive
+		"link_status":    "connected",
+		"current_status": "Idle",
+		"local_path":     "/volume1/gdrive-mirror",
+		"link_remote":    "/My Drive/homelab-mirror",
+		"username":       "jan@example.com",
+		"account_id":     "google:114-demo",
+		"direction":      2, // download-only
+		"last_sync_time": time.Now().Add(-26 * time.Hour).Unix(),
+		"total_size":     88_412_408_000, // ~82 GiB
+		"error_count":    0,
+		"enabled":        true,
+	},
+	{
+		"id":             103,
+		"display_name":   "S3 · cold-archive",
+		"link_type":      3, // S3
+		"link_status":    "connected",
+		"current_status": "Up to date",
+		"local_path":     "/volume2/archive",
+		"link_remote":    "s3://homelab-cold-archive/synology",
+		"username":       "AKIAIOSFODNN7EXAMPLE",
+		"account_id":     "s3:demo-bucket",
+		"direction":      1, // upload-only
+		"last_sync_time": time.Now().Add(-7 * 24 * time.Hour).Unix(),
+		"total_size":     1_840_412_408_000, // ~1.6 TiB
+		"error_count":    0,
+		"enabled":        true,
+	},
+	{
+		"id":             104,
+		"display_name":   "OneDrive · /work-docs",
+		"link_type":      2, // OneDrive
+		"link_status":    "error",
+		"current_status": "Error: token expired",
+		"local_path":     "/volume1/work-docs",
+		"link_remote":    "/Documents/Work",
+		"username":       "jan@example.org",
+		"account_id":     "ms:demo-tenant",
+		"direction":      0, // bidirectional
+		"last_sync_time": time.Now().Add(-3 * 24 * time.Hour).Unix(),
+		"total_size":     12_804_412_000, // ~12 GiB
+		"error_count":    14,
+		"enabled":        true,
+	},
+}
+
 // — drive —
 
 var demoDriveFiles = []map[string]any{

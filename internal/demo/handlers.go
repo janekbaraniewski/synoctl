@@ -88,6 +88,7 @@ func (s *Server) handlers() map[string]handlerFn {
 		"SYNO.Backup.Task:list":          s.handleHyperBackup,
 		"SYNO.ActiveBackup.Task:list":    s.handleActiveBackup,
 		"SYNO.ActiveBackup.Version:list": s.handleActiveBackupVersions,
+		"SYNO.CloudSync:list":            s.handleCloudSync,
 
 		// — drive —
 		"SYNO.SynologyDrive.Files:list":      s.handleDriveFiles,
@@ -493,6 +494,9 @@ func (s *Server) handleActiveBackup(_ *Server, _ url.Values) any {
 }
 func (s *Server) handleActiveBackupVersions(_ *Server, _ url.Values) any {
 	return map[string]any{"version_list": demoActiveBackupVersions, "total": len(demoActiveBackupVersions)}
+}
+func (s *Server) handleCloudSync(_ *Server, _ url.Values) any {
+	return map[string]any{"connections": demoCloudSyncTasks, "total": len(demoCloudSyncTasks)}
 }
 
 // — drive —
