@@ -1,21 +1,31 @@
 // Package tui hosts the bubbletea application — root model, theme, keymap,
-// and the registry of views. The theme is Catppuccin-derived (Mocha for
-// dark terminals, Latte for light) and exposed as a single Theme value so
-// views never reach into raw colours.
+// and the registry of views.
+//
+// The theme is a deliberately distinctive dark-first palette: deep slate
+// surfaces with a warm amber signature accent, paired with a cool cyan
+// secondary. It is *not* a Catppuccin lift — `synoctl` is supposed to feel
+// like its own tool when you launch it, not "yet another charm app". The
+// light variant mirrors with appropriate lightness flips so terminals on
+// light backgrounds remain readable.
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
 
-// Theme is the full visual palette used by every view. We expose semantic
-// slots (Accent, Success, Warn …) rather than raw hex so views don't get
-// to make their own colour choices.
+	"github.com/charmbracelet/lipgloss"
+)
+
+// Theme is the full visual palette used by every view. Views consume
+// semantic slots (Accent, Success, Warn …) rather than raw hex so view
+// code never makes its own colour choices.
 type Theme struct {
 	// Surfaces
-	Bg       lipgloss.AdaptiveColor // page background
-	BgAlt    lipgloss.AdaptiveColor // alternate row / sub-card
-	Surface  lipgloss.AdaptiveColor // card body
-	Border   lipgloss.AdaptiveColor // soft divider
-	BorderHi lipgloss.AdaptiveColor // strong divider / focused border
+	Bg         lipgloss.AdaptiveColor // page background
+	BgAlt      lipgloss.AdaptiveColor // alternate row / sub-card / chrome strip
+	Surface    lipgloss.AdaptiveColor // card body
+	SurfaceAlt lipgloss.AdaptiveColor // inspector pane bg (subtly different)
+	Border     lipgloss.AdaptiveColor // soft divider
+	BorderHi   lipgloss.AdaptiveColor // strong divider / focused border
 
 	// Text
 	Text  lipgloss.AdaptiveColor // primary text
@@ -23,8 +33,8 @@ type Theme struct {
 	Faint lipgloss.AdaptiveColor // tertiary / hint text
 
 	// Semantic accents
-	Accent  lipgloss.AdaptiveColor // brand / primary
-	Accent2 lipgloss.AdaptiveColor // secondary accent (for variety)
+	Accent  lipgloss.AdaptiveColor // brand / primary — signature amber
+	Accent2 lipgloss.AdaptiveColor // secondary accent — cool cyan
 	Success lipgloss.AdaptiveColor
 	Warn    lipgloss.AdaptiveColor
 	Error   lipgloss.AdaptiveColor
@@ -36,36 +46,45 @@ type Theme struct {
 	GradHi  lipgloss.AdaptiveColor
 }
 
-// DefaultTheme returns the Catppuccin-derived palette with light/dark variants.
-// We hand-pick from Mocha (dark) and Latte (light) so the result is readable
-// on both terminals without burning a runtime detector everywhere.
+// DefaultTheme returns the signature palette.
+//
+// Design notes:
+//   - Background and chrome use a slate-blue family so the foreground colour
+//     can carry the brand without fighting the surfaces.
+//   - The amber accent is the visual identity — it appears on the brand
+//     wordmark, the active sidebar marker, the focused border, and the
+//     primary gauge ramp's high stop is *not* this accent (so a "100% CPU"
+//     gauge doesn't look like brand chrome).
+//   - GradHi is deliberately red rather than amber so danger reads at a
+//     glance even on terminals that mute warm hues.
 func DefaultTheme() Theme {
 	return Theme{
-		Bg:       lipgloss.AdaptiveColor{Light: "#eff1f5", Dark: "#1e1e2e"},
-		BgAlt:    lipgloss.AdaptiveColor{Light: "#e6e9ef", Dark: "#181825"},
-		Surface:  lipgloss.AdaptiveColor{Light: "#dce0e8", Dark: "#313244"},
-		Border:   lipgloss.AdaptiveColor{Light: "#bcc0cc", Dark: "#45475a"},
-		BorderHi: lipgloss.AdaptiveColor{Light: "#8839ef", Dark: "#cba6f7"},
+		Bg:         lipgloss.AdaptiveColor{Light: "#f3f4f7", Dark: "#0d1117"},
+		BgAlt:      lipgloss.AdaptiveColor{Light: "#e7eaf0", Dark: "#161b22"},
+		Surface:    lipgloss.AdaptiveColor{Light: "#dde1ea", Dark: "#1c2230"},
+		SurfaceAlt: lipgloss.AdaptiveColor{Light: "#e7eaf0", Dark: "#171d28"},
+		Border:     lipgloss.AdaptiveColor{Light: "#c0c5d2", Dark: "#2a3142"},
+		BorderHi:   lipgloss.AdaptiveColor{Light: "#c2761b", Dark: "#f0a020"},
 
-		Text:  lipgloss.AdaptiveColor{Light: "#4c4f69", Dark: "#cdd6f4"},
-		Muted: lipgloss.AdaptiveColor{Light: "#6c6f85", Dark: "#a6adc8"},
-		Faint: lipgloss.AdaptiveColor{Light: "#9ca0b0", Dark: "#7f849c"},
+		Text:  lipgloss.AdaptiveColor{Light: "#1d2230", Dark: "#e6e9ef"},
+		Muted: lipgloss.AdaptiveColor{Light: "#5b6275", Dark: "#8b94a7"},
+		Faint: lipgloss.AdaptiveColor{Light: "#8b94a7", Dark: "#555c6e"},
 
-		Accent:  lipgloss.AdaptiveColor{Light: "#8839ef", Dark: "#cba6f7"}, // mauve
-		Accent2: lipgloss.AdaptiveColor{Light: "#1e66f5", Dark: "#89b4fa"}, // blue
-		Success: lipgloss.AdaptiveColor{Light: "#40a02b", Dark: "#a6e3a1"},
-		Warn:    lipgloss.AdaptiveColor{Light: "#df8e1d", Dark: "#f9e2af"},
-		Error:   lipgloss.AdaptiveColor{Light: "#d20f39", Dark: "#f38ba8"},
-		Info:    lipgloss.AdaptiveColor{Light: "#04a5e5", Dark: "#89dceb"},
+		Accent:  lipgloss.AdaptiveColor{Light: "#c2761b", Dark: "#f0a020"}, // signature amber
+		Accent2: lipgloss.AdaptiveColor{Light: "#1f6f9e", Dark: "#5dade2"}, // cool cyan
+		Success: lipgloss.AdaptiveColor{Light: "#3a8a4f", Dark: "#6fb86f"},
+		Warn:    lipgloss.AdaptiveColor{Light: "#a37a16", Dark: "#f0c674"},
+		Error:   lipgloss.AdaptiveColor{Light: "#c0392b", Dark: "#e26a6a"},
+		Info:    lipgloss.AdaptiveColor{Light: "#1f6f9e", Dark: "#5dade2"},
 
-		GradLo:  lipgloss.AdaptiveColor{Light: "#40a02b", Dark: "#a6e3a1"}, // green
-		GradMid: lipgloss.AdaptiveColor{Light: "#df8e1d", Dark: "#f9e2af"}, // yellow
-		GradHi:  lipgloss.AdaptiveColor{Light: "#d20f39", Dark: "#f38ba8"}, // red
+		GradLo:  lipgloss.AdaptiveColor{Light: "#3a8a4f", Dark: "#6fb86f"}, // green
+		GradMid: lipgloss.AdaptiveColor{Light: "#a37a16", Dark: "#f0c674"}, // amber
+		GradHi:  lipgloss.AdaptiveColor{Light: "#c0392b", Dark: "#e26a6a"}, // red
 	}
 }
 
-// Card returns a standard rounded-border card style. Pass a focused flag
-// to highlight the border when the view owns input focus.
+// Card returns a standard rounded-border card style. Pass focused=true to
+// highlight the border in the signature amber.
 func (t Theme) Card(focused bool) lipgloss.Style {
 	border := t.Border
 	if focused {
@@ -77,7 +96,7 @@ func (t Theme) Card(focused bool) lipgloss.Style {
 		Padding(0, 1)
 }
 
-// Title returns the style for a card title row (small caps feel via padding).
+// Title returns the style for a card title row.
 func (t Theme) Title() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(t.Accent).
@@ -119,27 +138,46 @@ func (t Theme) RowAlt() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(t.Text).Background(t.BgAlt)
 }
 
-// Selected highlights the active row.
+// Selected highlights the active row. Uses an amber underline on the alt
+// background instead of inverting the row — inversion fights inline status
+// chips that ride on row text.
 func (t Theme) Selected() lipgloss.Style {
 	return lipgloss.NewStyle().
-		Foreground(t.Bg).
-		Background(t.Accent).
+		Foreground(t.Accent).
+		Background(t.BgAlt).
 		Bold(true)
 }
 
 // HealthStyle returns a foreground-coloured style for a normalized health
-// string. We intentionally avoid backgrounds here — those look like ugly
-// horizontal blocks when used inside tables. The brand "chip" treatment
-// is reserved for the top/bottom chrome where rows aren't fighting it.
+// string. Backgrounds are intentionally avoided here — they look like ugly
+// horizontal blocks when used inside tables.
 func (t Theme) HealthStyle(s string) lipgloss.Style {
-	switch s {
-	case "normal", "ok", "running", "connected", "healthy":
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "normal", "ok", "running", "connected", "healthy", "active", "enabled", "up":
 		return lipgloss.NewStyle().Foreground(t.Success).Bold(true)
-	case "warn", "warning", "warn ", "degrade", "rebuilding":
+	case "warn", "warning", "degrade", "rebuilding", "starting", "stopping":
 		return lipgloss.NewStyle().Foreground(t.Warn).Bold(true)
-	case "crashed", "error", "err", "stop", "stopped", "disconnected", "broken":
+	case "crashed", "error", "err", "stop", "stopped", "disconnected", "broken", "failed", "down", "disabled":
 		return lipgloss.NewStyle().Foreground(t.Error).Bold(true)
 	default:
 		return lipgloss.NewStyle().Foreground(t.Muted)
 	}
+}
+
+// Wordmark renders the signature brand bug used in the top bar. Two letter
+// pairs flanked by a copper marker glyph that stays put as the rest of the
+// row changes.
+func (t Theme) Wordmark() string {
+	mark := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("◣")
+	word := lipgloss.NewStyle().Foreground(t.Text).Bold(true).Render("synoctl")
+	return mark + " " + word
+}
+
+// SidebarMarker is the active-row indicator used in the left nav. A thin
+// vertical bar in the signature amber.
+func (t Theme) SidebarMarker(active bool) string {
+	if active {
+		return lipgloss.NewStyle().Foreground(t.Accent).Render("▎")
+	}
+	return lipgloss.NewStyle().Foreground(t.BgAlt).Render(" ")
 }

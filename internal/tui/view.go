@@ -20,6 +20,26 @@ type ViewContext struct {
 	Logger *log.Logger
 }
 
+// TextEditing is an optional interface a View can implement to tell the
+// shell that it currently owns text input (an open form, prompt, OTP
+// modal, …). When true, the shell suppresses global key bindings so
+// typed runes — q, a, /, r, etc. — reach the view instead of triggering
+// quit / action menu / refresh. Views without typed-input state should
+// not implement this interface.
+type TextEditing interface {
+	IsTextEditing() bool
+}
+
+// Hinter is an optional interface a View can implement to render its own
+// context-aware bottom hint bar. The string is shown verbatim in the
+// shell's hint strip (which then suffixes globals like : / ? / q).
+//
+// Returning an empty string falls back to a static global hint. Each view
+// is expected to keep the string short — one line, ≤ width-30 cols.
+type Hinter interface {
+	Hint() string
+}
+
 // View is the contract every navigable screen implements.
 //
 // Refresh:

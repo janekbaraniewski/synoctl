@@ -20,10 +20,19 @@ type KeyMap struct {
 	Palette  key.Binding
 	Help     key.Binding
 	Quit     key.Binding
-	TabNext  key.Binding
-	TabPrev  key.Binding
-	Action   key.Binding // 'a' — context action menu
-	YankPath key.Binding // 'y' — copy current path/id to clipboard
+
+	// Sidebar nav — n/p step views (skipping headers), N/P jump sections.
+	// Tab / Shift+Tab stay as a power-user fallback.
+	NavNext     key.Binding
+	NavPrev     key.Binding
+	NavSection  key.Binding // 'N' — next section
+	NavSectionP key.Binding // 'P' — previous section
+	NavFocus    key.Binding // ctrl-l toggle sidebar focus (palette substitute)
+
+	Action       key.Binding // 'a' — context action menu
+	ToggleInsp   key.Binding // 'i' — toggle inspector
+	ToggleSide   key.Binding // 'b' — toggle sidebar (more space for content)
+	YankPath     key.Binding // 'y' — copy current path/id to clipboard
 }
 
 // DefaultKeys returns the standard, vim-flavoured binding set.
@@ -44,9 +53,16 @@ func DefaultKeys() KeyMap {
 		Palette:  key.NewBinding(key.WithKeys(":"), key.WithHelp(":", "command")),
 		Help:     key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
-		TabNext:  key.NewBinding(key.WithKeys("tab", "]"), key.WithHelp("⇥", "next view")),
-		TabPrev:  key.NewBinding(key.WithKeys("shift+tab", "["), key.WithHelp("⇧⇥", "prev view")),
-		Action:   key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "actions")),
-		YankPath: key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yank id")),
+
+		NavNext:     key.NewBinding(key.WithKeys("tab", "]"), key.WithHelp("⇥", "next view")),
+		NavPrev:     key.NewBinding(key.WithKeys("shift+tab", "["), key.WithHelp("⇧⇥", "prev view")),
+		NavSection:  key.NewBinding(key.WithKeys("}"), key.WithHelp("}", "next section")),
+		NavSectionP: key.NewBinding(key.WithKeys("{"), key.WithHelp("{", "prev section")),
+		NavFocus:    key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("^l", "focus sidebar")),
+
+		Action:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "actions")),
+		ToggleInsp: key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "toggle inspector")),
+		ToggleSide: key.NewBinding(key.WithKeys("ctrl+b"), key.WithHelp("^b", "toggle sidebar")),
+		YankPath:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yank id")),
 	}
 }
