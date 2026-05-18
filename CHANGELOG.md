@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.5](https://github.com/janekbaraniewski/synoctl/compare/v0.2.4...v0.2.5) (2026-05-18)
+
+
+### Bug Fixes
+
+* **ci:** drop golang/govulncheck-action to escape transitive tag refs ([ff81c88](https://github.com/janekbaraniewski/synoctl/commit/ff81c885a302c93e8b36c51f18ae75d5045b756d))
+* **ci:** grant write perms to dependabot rebase + skip scorecard publish on push ([774a3e3](https://github.com/janekbaraniewski/synoctl/commit/774a3e37e8722e48e1d538ff74bc4219a530fc31))
+* **ci:** pin remaining actions to full commit SHAs ([cb83c67](https://github.com/janekbaraniewski/synoctl/commit/cb83c6778186ca54993bb26cfbfc35da3a55452f))
+* **ci:** restore golang/govulncheck-action ([5740989](https://github.com/janekbaraniewski/synoctl/commit/57409899a58ce980785dd4a63456644d6ec7f8fc))
+
 ## [0.2.4](https://github.com/janekbaraniewski/synoctl/compare/v0.2.3...v0.2.4) (2026-05-18)
 
 
