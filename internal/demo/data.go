@@ -962,3 +962,121 @@ var demoUserQuotas = []map[string]any{
 			{"share": "volume1", "user_quota": 20_480, "used_quota": 18_960},
 		}},
 }
+
+// — virtual machine manager —
+//
+// Three plausible guests so the VMM view exercises every status it
+// renders: a running Home Assistant guest (the canonical homelab VM),
+// a shutoff debian sandbox, and a running Win11 guest with auto_run
+// turned on so the boot-with-host indicator has something to display.
+
+var demoVMs = []map[string]any{
+	{
+		"id":          "vm-homeassistant",
+		"name":        "homeassistant",
+		"vm_id":       "1",
+		"status":      "running",
+		"host":        "demo-ds923",
+		"vcpu_num":    2,
+		"vram_size":   2048, // MB
+		"description": "Home Assistant OS — KVM guest, persistent on /volume2/vmm",
+		"auto_run":    true,
+		"enable_ha":   false,
+	},
+	{
+		"id":          "vm-test-debian",
+		"name":        "test-debian",
+		"vm_id":       "2",
+		"status":      "shutoff",
+		"host":        "demo-ds923",
+		"vcpu_num":    1,
+		"vram_size":   1024,
+		"description": "Debian 12 sandbox — kept for one-off package testing",
+		"auto_run":    false,
+		"enable_ha":   false,
+	},
+	{
+		"id":          "vm-win11-test",
+		"name":        "win11-test-vm",
+		"vm_id":       "3",
+		"status":      "running",
+		"host":        "demo-ds923",
+		"vcpu_num":    4,
+		"vram_size":   8192,
+		"description": "Win11 test bench — TPM emulated, secure boot on",
+		"auto_run":    true,
+		"enable_ha":   false,
+	},
+}
+
+var demoVMHosts = []map[string]any{
+	{
+		"id":        "host-demo-ds923",
+		"name":      "demo-ds923",
+		"host_ip":   "192.168.1.42",
+		"vm_count":  3,
+		"cpu_usage": 27.4,
+		"ram_total": 8192,
+		"ram_used":  4608, // ha 2048 + win11 ~2560 actual working set
+		"running":   true,
+	},
+}
+
+// — iscsi / san manager —
+//
+// Two targets so the view exercises both common states: a healthy
+// "vmware-cluster" target with two active initiator connections, and a
+// disabled "legacy-mac" target that the operator's left configured but
+// turned off. CHAP auth is enabled on the active target.
+//
+// Three LUNs so the view exercises every backing type DSM exposes: a
+// thin-provisioned file LUN, a block-level LUN, and a newer pool-based
+// LUN on Btrfs. Sizes span the realistic 200 GiB → 4 TiB range.
+
+var demoISCSITargets = []map[string]any{
+	{
+		"target_id":        1,
+		"name":             "vmware-cluster",
+		"iqn":              "iqn.2000-01.com.synology:demo-ds923.target-1.vmware-cluster",
+		"enabled":          true,
+		"connection_count": 2,
+		"auth":             "chap",
+		"naa_id":           "naa.6001405a1b2c3d4e5f60718293a4b5c6",
+	},
+	{
+		"target_id":        2,
+		"name":             "legacy-mac",
+		"iqn":              "iqn.2000-01.com.synology:demo-ds923.target-2.legacy-mac",
+		"enabled":          false,
+		"connection_count": 0,
+		"auth":             "none",
+		"naa_id":           "naa.6001405d4e3c2b1a09f8e7d6c5b4a392",
+	},
+}
+
+var demoISCSILUNs = []map[string]any{
+	{
+		"lun_id":         101,
+		"name":           "esxi-datastore-01",
+		"size":           int64(2_199_023_255_552), // 2 TiB
+		"mapped_targets": []int{1},
+		"type":           "block",
+		"device_path":    "/dev/lun-block-101",
+	},
+	{
+		"lun_id":         102,
+		"name":           "esxi-datastore-02",
+		"size":           int64(1_099_511_627_776), // 1 TiB
+		"mapped_targets": []int{1},
+		"type":           "pool-based",
+		"device_path":    "/volume2/@iSCSI/lun-102",
+	},
+	{
+		"lun_id":         103,
+		"name":           "mac-timemachine-archive",
+		"size":           int64(214_748_364_800), // 200 GiB
+		"mapped_targets": []int{2},
+		"type":           "file",
+		"device_path":    "/volume1/@iSCSI/lun-103.lun",
+	},
+}

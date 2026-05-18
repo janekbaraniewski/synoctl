@@ -125,6 +125,14 @@ func (s *Server) handlers() map[string]handlerFn {
 
 		// — quotas (share quotas come from SYNO.Core.Share:list above) —
 		"SYNO.Core.User.Quota:list": s.handleUserQuotas,
+
+		// — virtual machine manager —
+		"SYNO.Virtualization.Guest:list": s.handleVMs,
+		"SYNO.Virtualization.Host:list":  s.handleVMHosts,
+
+		// — iscsi / san manager —
+		"SYNO.Core.ISCSI.Target:list": s.handleISCSITargets,
+		"SYNO.Core.ISCSI.LUN:list":    s.handleISCSILUNs,
 	}
 }
 
@@ -694,4 +702,22 @@ func (s *Server) handleNotificationLog(_ *Server, _ url.Values) any {
 
 func (s *Server) handleUserQuotas(_ *Server, _ url.Values) any {
 	return map[string]any{"users": demoUserQuotas, "total": len(demoUserQuotas)}
+}
+
+// — virtual machine manager —
+
+func (s *Server) handleVMs(_ *Server, _ url.Values) any {
+	return map[string]any{"guests": demoVMs, "total": len(demoVMs)}
+}
+func (s *Server) handleVMHosts(_ *Server, _ url.Values) any {
+	return map[string]any{"hosts": demoVMHosts, "total": len(demoVMHosts)}
+}
+
+// — iscsi / san manager —
+
+func (s *Server) handleISCSITargets(_ *Server, _ url.Values) any {
+	return map[string]any{"targets": demoISCSITargets, "total": len(demoISCSITargets)}
+}
+func (s *Server) handleISCSILUNs(_ *Server, _ url.Values) any {
+	return map[string]any{"luns": demoISCSILUNs, "total": len(demoISCSILUNs)}
 }
