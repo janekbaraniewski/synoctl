@@ -104,6 +104,13 @@ func (s *Server) handlers() map[string]handlerFn {
 		"SYNO.Core.DDNS.Provider:list":             s.handleDDNSProviders,
 		"SYNO.Core.DDNS.Record:list":               s.handleDDNSRecords,
 		"SYNO.Core.DDNS.ExtIP:list":                s.handleDDNSExtIP,
+
+		// — notifications —
+		"SYNO.Core.Notification.Service:get":  s.handleNotificationSettings,
+		"SYNO.Core.Notification.History:list": s.handleNotificationLog,
+
+		// — quotas (share quotas come from SYNO.Core.Share:list above) —
+		"SYNO.Core.User.Quota:list": s.handleUserQuotas,
 	}
 }
 
@@ -535,4 +542,20 @@ func (s *Server) handleDDNSRecords(_ *Server, _ url.Values) any {
 }
 func (s *Server) handleDDNSExtIP(_ *Server, _ url.Values) any {
 	return map[string]any{"ipv4": "203.0.113.42", "ipv6": "2001:db8::42"}
+}
+
+// — notifications —
+
+func (s *Server) handleNotificationSettings(_ *Server, _ url.Values) any {
+	return demoNotificationSettings
+}
+
+func (s *Server) handleNotificationLog(_ *Server, _ url.Values) any {
+	return map[string]any{"logs": demoNotificationLog, "total": len(demoNotificationLog)}
+}
+
+// — quotas —
+
+func (s *Server) handleUserQuotas(_ *Server, _ url.Values) any {
+	return map[string]any{"users": demoUserQuotas, "total": len(demoUserQuotas)}
 }

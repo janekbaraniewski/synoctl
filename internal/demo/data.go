@@ -804,3 +804,86 @@ var demoDDNSRecords = []map[string]any{
 	{"hostname": "homelab.dyndns.org", "provider": "DynDNS", "ipv4": "203.0.113.42", "ipv6": "", "status": "OK", "last_updated": time.Now().Add(-32 * time.Minute).Unix(), "enabled": true},
 	{"hostname": "vpn.cloudflare.net", "provider": "Cloudflare", "ipv4": "203.0.113.42", "ipv6": "2001:db8::42", "status": "OK", "last_updated": time.Now().Add(-5 * time.Minute).Unix(), "enabled": true},
 }
+
+// — notifications —
+
+// Email + push on (Pushover), SMS off, DSM-internal on. A couple of fake
+// recipients to populate the chip row in the view.
+var demoNotificationSettings = map[string]any{
+	"mail_enable":          true,
+	"push_enable":          true,
+	"sms_enable":           false,
+	"dsm_enable":           true,
+	"primary_email":        "jan@example.com",
+	"secondary_email":      "ops-alerts@example.com",
+	"recipients":           []string{"jan@example.com", "ops-alerts@example.com"},
+	"recent_failure_count": 0,
+}
+
+// 12 recent notifications spanning email + push + dsm channels with a
+// mix of info / warning / error severities. Timestamps land within the
+// last 7 days so the relative formatting in the row still looks
+// plausible after the binary's been built a few days.
+var demoNotificationLog = []map[string]any{
+	{"time": time.Now().Add(-12 * time.Minute).Unix(), "severity": "warning", "channel": "email",
+		"subject": "Disk SMART warning", "message": "sdc reported 4 reallocated sectors (was 3). Consider replacement.",
+		"recipient": "jan@example.com", "status": "success"},
+	{"time": time.Now().Add(-45 * time.Minute).Unix(), "severity": "info", "channel": "push",
+		"subject": "Backup task completed", "message": `"Daily homes → /volume2/backups" finished in 22m 14s.`,
+		"recipient": "Pushover (iPhone 15)", "status": "success"},
+	{"time": time.Now().Add(-3 * time.Hour).Unix(), "severity": "info", "channel": "dsm",
+		"subject": "Login from new device", "message": "Login from 192.168.1.5 using DSM web UI (user: baraniewski).",
+		"recipient": "DSM", "status": "success"},
+	{"time": time.Now().Add(-8 * time.Hour).Unix(), "severity": "error", "channel": "email",
+		"subject": "Camera disconnected", "message": "Front Door camera unreachable for 3 minutes — recordings paused.",
+		"recipient": "ops-alerts@example.com", "status": "success"},
+	{"time": time.Now().Add(-26 * time.Hour).Unix(), "severity": "warning", "channel": "push",
+		"subject": "SSL cert expiring", "message": "Let's Encrypt certificate for nas.example.com expires in 14 days.",
+		"recipient": "Pushover (iPhone 15)", "status": "success"},
+	{"time": time.Now().Add(-2 * 24 * time.Hour).Unix(), "severity": "info", "channel": "email",
+		"subject": "Scheduled task triggered", "message": `"Antivirus weekly scan" started; ETA 1h 12m.`,
+		"recipient": "jan@example.com", "status": "success"},
+	{"time": time.Now().Add(-3 * 24 * time.Hour).Unix(), "severity": "info", "channel": "dsm",
+		"subject": "Snapshot rotation", "message": "Removed 3 expired daily snapshots from /volume1/photo.",
+		"recipient": "DSM", "status": "success"},
+	{"time": time.Now().Add(-4 * 24 * time.Hour).Unix(), "severity": "warning", "channel": "email",
+		"subject": "Quota nearing limit", "message": "Share photo at 89% of configured quota (1.78 TiB of 2 TiB).",
+		"recipient": "jan@example.com", "status": "success"},
+	{"time": time.Now().Add(-5 * 24 * time.Hour).Unix(), "severity": "info", "channel": "push",
+		"subject": "Package updated", "message": "Synology Drive auto-updated to 3.5.0-26100.",
+		"recipient": "Pushover (iPhone 15)", "status": "success"},
+	{"time": time.Now().Add(-5*24*time.Hour - 4*time.Hour).Unix(), "severity": "error", "channel": "email",
+		"subject": "Hyper Backup task failed", "message": `"Offsite Backblaze" failed: destination throttled (HTTP 503). Retry queued.`,
+		"recipient": "ops-alerts@example.com", "status": "failed"},
+	{"time": time.Now().Add(-6 * 24 * time.Hour).Unix(), "severity": "info", "channel": "dsm",
+		"subject": "Volume scrub completed", "message": "Volume 1 scrub completed; 0 errors across 6.4 TiB.",
+		"recipient": "DSM", "status": "success"},
+	{"time": time.Now().Add(-7 * 24 * time.Hour).Unix(), "severity": "warning", "channel": "push",
+		"subject": "Failed login attempt", "message": "3 failed admin logins from 203.0.113.99 (auto-blocked).",
+		"recipient": "Pushover (iPhone 15)", "status": "success"},
+}
+
+// — user quotas —
+
+// One entry per local user (a subset of demoUsers) — DSM expresses sizes
+// in MiB in this endpoint, so the numbers below are MiB and the view
+// rolls them up to GiB / TiB for display.
+var demoUserQuotas = []map[string]any{
+	{"name": "baraniewski", "uid": 1026, "quota": 524_288, "used": 312_456,
+		"volumes": []map[string]any{
+			{"share": "volume1", "user_quota": 262_144, "used_quota": 198_320},
+			{"share": "volume2", "user_quota": 262_144, "used_quota": 114_136},
+		}},
+	{"name": "demo", "uid": 1027, "quota": 51_200, "used": 12_842,
+		"volumes": []map[string]any{
+			{"share": "volume1", "user_quota": 51_200, "used_quota": 12_842},
+		}},
+	{"name": "backup-svc", "uid": 1028, "quota": 1_048_576, "used": 892_104,
+		"volumes": []map[string]any{
+			{"share": "volume2", "user_quota": 1_048_576, "used_quota": 892_104},
+		}},
+	{"name": "kid", "uid": 1030, "quota": 20_480, "used": 18_960,
+		"volumes": []map[string]any{
+			{"share": "volume1", "user_quota": 20_480, "used_quota": 18_960},
+		}},
+}
