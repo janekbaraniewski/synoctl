@@ -184,3 +184,61 @@ func maxInt(a, b int) int {
 func errLine(t tui.Theme, err error) string {
 	return lipgloss.NewStyle().Foreground(t.Error).Render("  " + err.Error())
 }
+
+// fitOrScroll trims output to at most `n` lines, padding short output to
+// fill. Used by list views whose composed sections might exceed the
+// allocated body height.
+func fitOrScroll(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) <= n {
+		return s + strings.Repeat("\n", n-len(lines))
+	}
+	return strings.Join(lines[:n], "\n")
+}
+
+// sectionHeader renders a "Title (n) ───────" header used by list views.
+// The accent-coloured rule uses the soft border so it reads as a real
+// divider on dark terminals without overpowering the title.
+func sectionHeader(t tui.Theme, width int, title string, count int, err error) string {
+	titleStyle := t.Title().Render(title)
+	countStyle := lipgloss.NewStyle().Foreground(t.Muted).Render("(" + itoaShort(count) + ")")
+	left := titleStyle + " " + countStyle
+	leftW := lipgloss.Width(left)
+	rule := strings.Repeat("─", maxInt(width-leftW-4, 0))
+	out := left + "  " + lipgloss.NewStyle().Foreground(t.Accent).Faint(true).Render(rule)
+	if err != nil {
+		out += "\n" + errLine(t, err)
+	}
+	return out
+}
+
+// caretGlyph renders the ▸ row-selected indicator. When off it returns a
+// single space of the same visual width so columns don't shift.
+func caretGlyph(t tui.Theme, on bool) string {
+	if on {
+		return lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▸")
+	}
+	return " "
+}
+
+func itoaShort(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	digits := [20]byte{}
+	i := len(digits)
+	for n > 0 {
+		i--
+		digits[i] = '0' + byte(n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		digits[i] = '-'
+	}
+	return string(digits[i:])
+}
