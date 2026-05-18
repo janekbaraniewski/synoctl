@@ -2,6 +2,7 @@ package dsm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -161,6 +162,202 @@ func (c *Client) Utilization(ctx context.Context) (*Utilization, error) {
 		return nil, err
 	}
 	return &out, nil
+}
+
+// UtilizationHistory returns a slice of historical utilisation samples for
+// the given window: "hour", "day", "week", "month", or "year". DSM
+// firmwares disagree about the response shape:
+//
+//   - Modern firmwares return data as an array of per-slot Utilization
+//     objects (or a `{ "items": [...] }` envelope).
+//   - Older firmwares return a single Utilization object where the scalar
+//     fields (cpu.user_load, memory.real_usage, disk.total.util, …) are
+//     replaced by arrays of values, one per slot in the window.
+//
+// We try the modern shape first and fall back to the embedded-series shape
+// when decoding it as a list fails.
+func (c *Client) UtilizationHistory(ctx context.Context, window string) ([]Utilization, error) {
+	switch window {
+	case "hour", "day", "week", "month", "year":
+	default:
+		return nil, fmt.Errorf("dsm: unknown utilization window %q", window)
+	}
+	params := url.Values{}
+	params.Set("type", window)
+	var raw json.RawMessage
+	if err := c.Call(ctx, "SYNO.Core.System.Utilization", 1, "get", params, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	// Shape A: top-level array of Utilization.
+	var arr []Utilization
+	if err := json.Unmarshal(raw, &arr); err == nil && len(arr) > 0 {
+		return arr, nil
+	}
+	// Shape B: wrapped in { "items": [...] } or { "data": [...] }.
+	var wrap struct {
+		Items []Utilization   `json:"items"`
+		Data  []Utilization   `json:"data"`
+		List  []Utilization   `json:"list"`
+		Raw   json.RawMessage `json:"-"`
+	}
+	if err := json.Unmarshal(raw, &wrap); err == nil {
+		if len(wrap.Items) > 0 {
+			return wrap.Items, nil
+		}
+		if len(wrap.Data) > 0 {
+			return wrap.Data, nil
+		}
+		if len(wrap.List) > 0 {
+			return wrap.List, nil
+		}
+	}
+	// Shape C: a single Utilization object where scalar fields are
+	// actually arrays of per-slot values. We project that back into a
+	// list of Utilization samples by index-aligning the series.
+	samples, ok := expandSeriesSample(raw)
+	if ok && len(samples) > 0 {
+		return samples, nil
+	}
+	// Last resort: a single Utilization with scalar fields — return a
+	// one-element slice so callers don't have to special-case empty
+	// responses.
+	var one Utilization
+	if err := json.Unmarshal(raw, &one); err == nil {
+		return []Utilization{one}, nil
+	}
+	return nil, fmt.Errorf("dsm: unrecognised UtilizationHistory shape")
+}
+
+// expandSeriesSample interprets the embedded-series response shape: a
+// single object where cpu / memory / disk / network fields hold parallel
+// arrays of values. The number of slots is taken from the longest array
+// we can find; shorter arrays are zero-extended at their tail.
+//
+// We only consume the fields the Resource Monitor renders today (CPU
+// loads, Memory real_usage, Network total rx/tx, Disk total util). The
+// full Utilization struct is preserved for shape A; this function is a
+// pure backward-compat path.
+func expandSeriesSample(raw json.RawMessage) ([]Utilization, bool) {
+	var probe struct {
+		CPU struct {
+			UserLoad   json.RawMessage `json:"user_load"`
+			SystemLoad json.RawMessage `json:"system_load"`
+			OtherLoad  json.RawMessage `json:"other_load"`
+		} `json:"cpu"`
+		Memory struct {
+			RealUsage json.RawMessage `json:"real_usage"`
+		} `json:"memory"`
+		Network []struct {
+			Device string          `json:"device"`
+			Rx     json.RawMessage `json:"rx"`
+			Tx     json.RawMessage `json:"tx"`
+		} `json:"network"`
+		Disk struct {
+			Total struct {
+				Util json.RawMessage `json:"util"`
+			} `json:"total"`
+		} `json:"disk"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return nil, false
+	}
+	cpuUser := decodeIntSeries(probe.CPU.UserLoad)
+	cpuSys := decodeIntSeries(probe.CPU.SystemLoad)
+	cpuOther := decodeIntSeries(probe.CPU.OtherLoad)
+	memUse := decodeIntSeries(probe.Memory.RealUsage)
+	diskUtil := decodeIntSeries(probe.Disk.Total.Util)
+	var rx, tx []int64
+	for _, n := range probe.Network {
+		if n.Device == "total" {
+			rx = decodeInt64Series(n.Rx)
+			tx = decodeInt64Series(n.Tx)
+			break
+		}
+	}
+	n := 0
+	for _, s := range [][]int{cpuUser, cpuSys, cpuOther, memUse, diskUtil} {
+		if len(s) > n {
+			n = len(s)
+		}
+	}
+	if len(rx) > n {
+		n = len(rx)
+	}
+	if len(tx) > n {
+		n = len(tx)
+	}
+	if n == 0 {
+		return nil, false
+	}
+	out := make([]Utilization, n)
+	for i := 0; i < n; i++ {
+		out[i].CPU.UserLoad = atOrZero(cpuUser, i)
+		out[i].CPU.SystemLoad = atOrZero(cpuSys, i)
+		out[i].CPU.OtherLoad = atOrZero(cpuOther, i)
+		out[i].Memory.RealUsage = atOrZero(memUse, i)
+		out[i].Disk.Total.Util = atOrZero(diskUtil, i)
+		if i < len(rx) || i < len(tx) {
+			out[i].Network = []struct {
+				Device string `json:"device"`
+				Rx     int64  `json:"rx"`
+				Tx     int64  `json:"tx"`
+			}{{
+				Device: "total",
+				Rx:     atOrZero64(rx, i),
+				Tx:     atOrZero64(tx, i),
+			}}
+		}
+	}
+	return out, true
+}
+
+// decodeIntSeries parses either a JSON array of ints or a single int into
+// an []int. Empty / null / non-numeric → nil.
+func decodeIntSeries(b json.RawMessage) []int {
+	if len(b) == 0 || string(b) == "null" {
+		return nil
+	}
+	var arr []int
+	if err := json.Unmarshal(b, &arr); err == nil {
+		return arr
+	}
+	var one int
+	if err := json.Unmarshal(b, &one); err == nil {
+		return []int{one}
+	}
+	return nil
+}
+
+func decodeInt64Series(b json.RawMessage) []int64 {
+	if len(b) == 0 || string(b) == "null" {
+		return nil
+	}
+	var arr []int64
+	if err := json.Unmarshal(b, &arr); err == nil {
+		return arr
+	}
+	var one int64
+	if err := json.Unmarshal(b, &one); err == nil {
+		return []int64{one}
+	}
+	return nil
+}
+
+func atOrZero(s []int, i int) int {
+	if i < len(s) {
+		return s[i]
+	}
+	return 0
+}
+
+func atOrZero64(s []int64, i int) int64 {
+	if i < len(s) {
+		return s[i]
+	}
+	return 0
 }
 
 // Reboot triggers a system reboot. Requires admin privileges.
