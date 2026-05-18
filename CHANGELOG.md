@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.3](https://github.com/janekbaraniewski/synoctl/compare/v0.2.2...v0.2.3) (2026-05-18)
+
+
+### Features
+
+* **backup:** run-now and suspend/resume for Hyper Backup + Active Backup ([207b5b1](https://github.com/janekbaraniewski/synoctl/commit/207b5b15d5926c46b05e2f49279a9c6bcd02e262))
+* **containers:** tabbed Containers / Images / Networks view ([f8ccb5e](https://github.com/janekbaraniewski/synoctl/commit/f8ccb5ef79639ec1bfd9a1aa8b98caf171c378e5))
+* **coverage:** Virtual Machine Manager + iSCSI/SAN views ([1d3856a](https://github.com/janekbaraniewski/synoctl/commit/1d3856afc99315e49f217d644d3942ed5fe88508))
+* **monitor:** Resource Monitor view with historical CPU/mem/net/disk charts ([34b4957](https://github.com/janekbaraniewski/synoctl/commit/34b49577563b2529151404e7e1e112078998a52d))
+
 ## [0.2.2](https://github.com/janekbaraniewski/synoctl/compare/v0.2.1...v0.2.2) (2026-05-18)
 
 
