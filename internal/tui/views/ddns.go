@@ -92,7 +92,7 @@ func (v *DDNSView) Bindings() []key.Binding {
 // IsTextEditing tells the shell to defer global keys while the form or
 // confirm modal owns input — typed runes need to reach those widgets.
 func (v *DDNSView) IsTextEditing() bool {
-	return v.form.Open() || v.confirm.Open()
+	return v.form.Open() || v.confirm.Open() || v.filter.IsActive()
 }
 
 func (v *DDNSView) Init() tea.Cmd { return tea.Batch(v.fetchRecords(), v.fetchProviders()) }
@@ -255,7 +255,11 @@ func (v *DDNSView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -286,6 +290,7 @@ func (v *DDNSView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

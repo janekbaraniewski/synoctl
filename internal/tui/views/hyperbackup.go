@@ -80,7 +80,7 @@ func (v *HyperBackupView) Hint() string {
 // IsTextEditing defers global keys (q quit, /, etc.) to the confirm
 // modal while it's owning input. Without this, "y" or "n" would also
 // trigger the global filter or quit handlers.
-func (v *HyperBackupView) IsTextEditing() bool { return v.confirm.Open() }
+func (v *HyperBackupView) IsTextEditing() bool { return v.confirm.Open() || v.filter.IsActive() }
 
 func (v *HyperBackupView) Init() tea.Cmd { return v.fetchTasks() }
 
@@ -217,7 +217,11 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -245,6 +249,7 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

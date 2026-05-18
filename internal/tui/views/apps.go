@@ -128,8 +128,8 @@ func (a *Apps) Hint() string {
 	return ""
 }
 
-// IsTextEditing defers global keys to the confirm modal while it's open.
-func (a *Apps) IsTextEditing() bool { return a.confirm.Open() }
+// IsTextEditing defers global keys while a modal or inline filter owns input.
+func (a *Apps) IsTextEditing() bool { return a.confirm.Open() || a.base().filter.IsActive() }
 
 func (a *Apps) Init() tea.Cmd { return tea.Batch(a.fetchInstalled(), a.fetchServices()) }
 

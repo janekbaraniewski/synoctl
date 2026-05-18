@@ -49,6 +49,7 @@ func (v *SecurityAdvisorView) Title() string                  { return "Security
 func (v *SecurityAdvisorView) Icon() string                   { return "⚐" }
 func (v *SecurityAdvisorView) RefreshInterval() time.Duration { return 5 * time.Minute }
 func (v *SecurityAdvisorView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *SecurityAdvisorView) IsTextEditing() bool            { return v.filter.IsActive() }
 
 func (v *SecurityAdvisorView) Init() tea.Cmd {
 	return tea.Batch(v.fetchReport(), v.fetchItems())
@@ -96,7 +97,11 @@ func (v *SecurityAdvisorView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -127,6 +132,7 @@ func (v *SecurityAdvisorView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

@@ -86,7 +86,7 @@ func (s *Shares) Bindings() []key.Binding {
 // snapshot-flow modals are open — typed runes (codes, descriptions,
 // y/n confirms) must reach the input, not trigger quit/actions.
 func (s *Shares) IsTextEditing() bool {
-	return s.otp.Open() || s.confirm.Open() || s.prompt.Open()
+	return s.otp.Open() || s.confirm.Open() || s.prompt.Open() || s.base.filter.IsActive()
 }
 
 // Hint returns mode-specific keys for the global hint strip. The strip

@@ -101,7 +101,7 @@ func (c *Client) FileShares(ctx context.Context) ([]FileShare, error) {
 // separately for callers that want the server's suggested filename.
 func (c *Client) FileDownload(ctx context.Context, path string) (rc io.ReadCloser, contentDisposition string, err error) {
 	params := url.Values{}
-	params.Set("path", `["`+path+`"]`)
+	params.Set("path", jsonStringArray(path))
 	params.Set("mode", "download")
 	return c.RawCall(ctx, "SYNO.FileStation.Download", 2, "download", params)
 }
@@ -111,7 +111,7 @@ func (c *Client) FileDownload(ctx context.Context, path string) (rc io.ReadClose
 // required for non-empty directories.
 func (c *Client) FileDelete(ctx context.Context, path string, recursive bool) error {
 	params := url.Values{}
-	params.Set("path", `["`+path+`"]`)
+	params.Set("path", jsonStringArray(path))
 	if recursive {
 		params.Set("recursive", "true")
 	}
@@ -122,8 +122,8 @@ func (c *Client) FileDelete(ctx context.Context, path string, recursive bool) er
 // (not a full path).
 func (c *Client) FileRename(ctx context.Context, path, newName string) error {
 	params := url.Values{}
-	params.Set("path", `["`+path+`"]`)
-	params.Set("name", `["`+newName+`"]`)
+	params.Set("path", jsonStringArray(path))
+	params.Set("name", jsonStringArray(newName))
 	return c.Call(ctx, "SYNO.FileStation.Rename", 2, "rename", params, nil)
 }
 
@@ -396,7 +396,7 @@ type DirSizeResult struct {
 // result rather than re-running it on every render.
 func (c *Client) DirSize(ctx context.Context, dirPath string) (DirSizeResult, error) {
 	startParams := url.Values{}
-	startParams.Set("path", `["`+dirPath+`"]`)
+	startParams.Set("path", jsonStringArray(dirPath))
 	var start struct {
 		TaskID string `json:"taskid"`
 	}
@@ -432,4 +432,12 @@ func (c *Client) DirSize(ctx context.Context, dirPath string) (DirSizeResult, er
 		case <-tick.C:
 		}
 	}
+}
+
+func jsonStringArray(values ...string) string {
+	b, err := json.Marshal(values)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }

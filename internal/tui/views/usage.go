@@ -17,39 +17,37 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
 )
 
-// Usage is the disk-usage analyzer. It mirrors ncdu's "drill in, see
-// what's big" model:
+// Usage is the disk-usage analyzer. It renders an expandable "what is big"
+// tree:
 //
 //   - At the root it lists FileStation shares ordered by used space.
-//   - Inside a directory it lists immediate children, sorted descending
-//     by size. Files use their list metadata; folders are sized
-//     asynchronously via SYNO.FileStation.DirSize.
+//   - Expanding a directory inserts immediate children underneath it. Files
+//     use their list metadata; folders are sized asynchronously via
+//     SYNO.FileStation.DirSize.
 //   - Results are cached for the duration of the TUI session.
-//   - Concurrency is gentle (3 in-flight DirSize calls) so the box
+//   - Concurrency is gentle (2 in-flight DirSize calls) so the box
 //     doesn't get hammered.
 //
-// Pressing `e` toggles "extension breakdown" mode — aggregates files at
-// the current level (and any sized descendants we've already walked) into
-// one row per extension, sorted by total size.
+// Pressing `e` toggles "extension breakdown" mode — aggregates currently
+// visible files into one row per extension, sorted by total size.
 type Usage struct {
 	ctx Ctx
-
-	cwd string // "" = share-list root
 
 	// Per-path cache. sizeCache keys are absolute DSM paths; values are
 	// directory totals returned by DSM.
 	cache *usageCache
 
-	// Current listing.
+	// Root share rows. Expanded child rows live in children.
 	entries []usageEntry
-	loading bool
-	err     error
+
+	children    map[string][]usageEntry
+	childErr    map[string]error
+	expanded    map[string]bool
+	loadingDirs map[string]bool
 
 	base       listBase
 	extensionM bool // 'e' — extension breakdown mode
-	stack      []string
 
-	// Roots (when cwd == "").
 	roots    []dsm.FileShare
 	rootsErr error
 }
@@ -65,6 +63,8 @@ type usageEntry struct {
 	Err    error  // dir sizing failed
 	Ext    string // for extension-breakdown rows
 	Count  int    // file count for extension-breakdown rows
+	Level  int
+	Status string
 }
 
 // usageCache stores DirSize results so re-entering a folder is instant.
@@ -90,18 +90,32 @@ func (c *usageCache) set(p string, v int64) {
 	c.mu.Unlock()
 }
 
+func (c *usageCache) delete(p string) {
+	c.mu.Lock()
+	delete(c.v, p)
+	c.mu.Unlock()
+}
+
 // NewUsage constructs the analyzer view.
 func NewUsage(c Ctx) tui.View {
-	return &Usage{ctx: c, cache: newUsageCache()}
+	return &Usage{
+		ctx:         c,
+		cache:       newUsageCache(),
+		children:    map[string][]usageEntry{},
+		childErr:    map[string]error{},
+		expanded:    map[string]bool{},
+		loadingDirs: map[string]bool{},
+	}
 }
 
 func (u *Usage) Name() string                   { return "usage" }
 func (u *Usage) Title() string                  { return "Usage Analyzer" }
 func (u *Usage) Icon() string                   { return "◴" }
 func (u *Usage) RefreshInterval() time.Duration { return 0 }
+func (u *Usage) IsTextEditing() bool            { return u.base.filter.IsActive() }
 func (u *Usage) Bindings() []key.Binding {
 	return append(BaseBindings(),
-		key.NewBinding(key.WithKeys("backspace", "h"), key.WithHelp("⌫/h", "up one")),
+		key.NewBinding(key.WithKeys("backspace", "h"), key.WithHelp("⌫/h", "collapse")),
 		key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "extension breakdown")),
 		key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "re-size current dir")),
 	)
@@ -122,23 +136,24 @@ func (u *Usage) fetchRoots() tea.Cmd {
 	)
 }
 
-// loadDir lists the immediate children of u.cwd and kicks off DirSize for
+// loadDir lists the immediate children of dirPath and kicks off DirSize for
 // each subdirectory (unless already cached). Files are inserted with
 // their known sizes.
-func (u *Usage) loadDir() tea.Cmd {
+func (u *Usage) loadDir(dirPath string) tea.Cmd {
 	c := u.ctx.Client
 	if c == nil {
 		return nil
 	}
-	u.loading = true
-	cwd := u.cwd
+	u.ensureTreeMaps()
+	u.loadingDirs[dirPath] = true
+	delete(u.childErr, dirPath)
 	return tui.Fetch(30*time.Second,
 		func(ctx context.Context) ([]dsm.FSEntry, error) {
-			items, _, err := c.ListFiles(ctx, cwd, 0, 1000)
+			items, _, err := c.ListFiles(ctx, dirPath, 0, 1000)
 			return items, err
 		},
 		func(items []dsm.FSEntry, err error) tea.Msg {
-			return usageListedMsg{Path: cwd, Items: items, Err: err}
+			return usageListedMsg{Path: dirPath, Items: items, Err: err}
 		},
 	)
 }
@@ -170,9 +185,43 @@ func (u *Usage) dirSizeCmd(dirPath string) tea.Cmd {
 func (u *Usage) kickPendingSizes() tea.Cmd {
 	const maxInflight = 2
 	var cmds []tea.Cmd
-	inflight := 0
-	for i := range u.entries {
-		e := &u.entries[i]
+	inflight := u.countSizing()
+	u.startPendingSizes(&u.entries, &cmds, &inflight, maxInflight)
+	if inflight < maxInflight {
+		for p, entries := range u.children {
+			u.startPendingSizes(&entries, &cmds, &inflight, maxInflight)
+			u.children[p] = entries
+			if inflight >= maxInflight {
+				break
+			}
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+func (u *Usage) countSizing() int {
+	total := 0
+	for _, e := range u.entries {
+		if e.Sizing {
+			total++
+		}
+	}
+	for _, entries := range u.children {
+		for _, e := range entries {
+			if e.Sizing {
+				total++
+			}
+		}
+	}
+	return total
+}
+
+func (u *Usage) startPendingSizes(entries *[]usageEntry, cmds *[]tea.Cmd, inflight *int, maxInflight int) {
+	for i := range *entries {
+		e := &(*entries)[i]
 		if !e.IsDir || e.Sized || e.Sizing || e.Err != nil {
 			continue
 		}
@@ -182,16 +231,12 @@ func (u *Usage) kickPendingSizes() tea.Cmd {
 			continue
 		}
 		e.Sizing = true
-		cmds = append(cmds, u.dirSizeCmd(e.Path))
-		inflight++
-		if inflight >= maxInflight {
-			break
+		*cmds = append(*cmds, u.dirSizeCmd(e.Path))
+		(*inflight)++
+		if *inflight >= maxInflight {
+			return
 		}
 	}
-	if len(cmds) == 0 {
-		return nil
-	}
-	return tea.Batch(cmds...)
 }
 
 // — messages —
@@ -243,16 +288,14 @@ func (u *Usage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		u.base.ClampCursor(u.rowCount())
 		return u, u.kickPendingSizes()
 	case usageListedMsg:
-		if m.Path != u.cwd {
-			return u, nil // late arrival — user moved on
-		}
-		u.loading = false
+		u.ensureTreeMaps()
+		u.loadingDirs[m.Path] = false
 		if m.Err != nil {
-			u.err = m.Err
+			u.childErr[m.Path] = m.Err
 			return u, nil
 		}
-		u.err = nil
-		u.entries = u.entries[:0]
+		delete(u.childErr, m.Path)
+		children := make([]usageEntry, 0, len(m.Items))
 		for _, e := range m.Items {
 			ue := usageEntry{
 				Name:  e.Name,
@@ -267,8 +310,9 @@ func (u *Usage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 					ue.Sized = true
 				}
 			}
-			u.entries = append(u.entries, ue)
+			children = append(children, ue)
 		}
+		u.children[m.Path] = children
 		u.sortBySize()
 		u.base.ClampCursor(u.rowCount())
 		return u, u.kickPendingSizes()
@@ -276,18 +320,7 @@ func (u *Usage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		if m.Err == nil {
 			u.cache.set(m.Path, m.Size)
 		}
-		for i := range u.entries {
-			if u.entries[i].Path == m.Path {
-				u.entries[i].Sizing = false
-				if m.Err != nil {
-					u.entries[i].Err = m.Err
-				} else {
-					u.entries[i].Size = m.Size
-					u.entries[i].Sized = true
-				}
-				break
-			}
-		}
+		u.applySized(m)
 		u.sortBySize()
 		return u, u.kickPendingSizes()
 	}
@@ -302,23 +335,13 @@ func (u *Usage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		case "backspace", "h":
 			return u, u.upDir()
 		case "esc":
-			if u.cwd != "" {
-				return u, u.upDir()
-			}
+			return u, u.upDir()
 		case "e":
 			u.extensionM = !u.extensionM
 			return u, nil
 		case "R":
-			// Re-size: forget cache for cwd's children and refetch.
-			for _, e := range u.entries {
-				if e.IsDir {
-					u.cache.set(e.Path, -1) // negative sentinel ignored on read
-				}
-			}
-			if u.cwd == "" {
-				return u, u.fetchRoots()
-			}
-			return u, u.loadDir()
+			u.forgetVisibleSizes()
+			return u, u.kickPendingSizes()
 		}
 	}
 	return u, nil
@@ -330,45 +353,92 @@ func (u *Usage) drillDown() tea.Cmd {
 		return nil
 	}
 	e := rows[u.base.Cursor()]
-	if !e.IsDir {
+	if !e.IsDir || e.Status != "" || u.extensionM {
 		return nil
 	}
-	u.stack = append(u.stack, u.cwd)
-	u.cwd = e.Path
-	u.base.ResetCursor()
-	// Clear entries up front so the user sees a "listing…" placeholder
-	// instead of the previous folder's stale rows for the 5–15 seconds
-	// the DS220j takes to answer the new ListFiles call.
-	u.entries = nil
-	u.err = nil
-	return u.loadDir()
+	u.ensureTreeMaps()
+	if u.expanded[e.Path] {
+		delete(u.expanded, e.Path)
+		u.base.ClampCursor(u.rowCount())
+		return nil
+	}
+	u.expanded[e.Path] = true
+	if _, ok := u.children[e.Path]; ok || u.loadingDirs[e.Path] {
+		return nil
+	}
+	return u.loadDir(e.Path)
 }
 
 func (u *Usage) upDir() tea.Cmd {
-	if u.cwd == "" {
+	rows := u.viewRows()
+	if u.base.Cursor() >= len(rows) {
 		return nil
 	}
-	u.entries = nil
-	u.err = nil
-	if len(u.stack) > 0 {
-		prev := u.stack[len(u.stack)-1]
-		u.stack = u.stack[:len(u.stack)-1]
-		u.cwd = prev
-		u.base.ResetCursor()
-		if prev == "" {
-			return u.fetchRoots()
+	row := rows[u.base.Cursor()]
+	if row.IsDir && row.Status == "" && u.expanded[row.Path] {
+		delete(u.expanded, row.Path)
+		u.base.ClampCursor(u.rowCount())
+		return nil
+	}
+	for i := u.base.Cursor() - 1; i >= 0; i-- {
+		parent := rows[i]
+		if parent.Level >= row.Level || !parent.IsDir || parent.Status != "" {
+			continue
 		}
-		return u.loadDir()
+		delete(u.expanded, parent.Path)
+		u.base.cursor = i
+		u.base.ClampCursor(u.rowCount())
+		return nil
 	}
-	parent := path.Dir(u.cwd)
-	if parent == "." || parent == "/" {
-		u.cwd = ""
-		u.base.ResetCursor()
-		return u.fetchRoots()
+	return nil
+}
+
+func (u *Usage) applySized(m usageSizedMsg) {
+	apply := func(entries []usageEntry) bool {
+		for i := range entries {
+			if entries[i].Path != m.Path {
+				continue
+			}
+			entries[i].Sizing = false
+			if m.Err != nil {
+				entries[i].Err = m.Err
+			} else {
+				entries[i].Size = m.Size
+				entries[i].Sized = true
+			}
+			return true
+		}
+		return false
 	}
-	u.cwd = parent
-	u.base.ResetCursor()
-	return u.loadDir()
+	if apply(u.entries) {
+		return
+	}
+	for p, entries := range u.children {
+		if apply(entries) {
+			u.children[p] = entries
+			return
+		}
+	}
+}
+
+func (u *Usage) forgetVisibleSizes() {
+	reset := func(entries []usageEntry) {
+		for i := range entries {
+			if !entries[i].IsDir || entries[i].Status != "" {
+				continue
+			}
+			u.cache.delete(entries[i].Path)
+			entries[i].Size = 0
+			entries[i].Sized = false
+			entries[i].Sizing = false
+			entries[i].Err = nil
+		}
+	}
+	reset(u.entries)
+	for p, entries := range u.children {
+		reset(entries)
+		u.children[p] = entries
+	}
 }
 
 // sortBySize sorts the entries by descending size, but only once every
@@ -378,13 +448,21 @@ func (u *Usage) upDir() tea.Cmd {
 // first, alphabetical) until everything is sized, then do one final
 // sort.
 func (u *Usage) sortBySize() {
-	for _, e := range u.entries {
+	sortUsageEntries(u.entries)
+	for p, entries := range u.children {
+		sortUsageEntries(entries)
+		u.children[p] = entries
+	}
+}
+
+func sortUsageEntries(entries []usageEntry) {
+	for _, e := range entries {
 		if e.Sizing {
 			return
 		}
 	}
-	sort.SliceStable(u.entries, func(i, j int) bool {
-		return u.entries[i].Size > u.entries[j].Size
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].Size > entries[j].Size
 	})
 }
 
@@ -392,14 +470,67 @@ func (u *Usage) rowCount() int { return len(u.viewRows()) }
 
 // dirRows returns the regular (non-extension) entries.
 func (u *Usage) dirRows() []usageEntry {
-	if u.base.FilterValue() == "" {
-		return u.entries
+	return u.flattenUsageRows(u.base.FilterValue())
+}
+
+func (u *Usage) ensureTreeMaps() {
+	if u.children == nil {
+		u.children = map[string][]usageEntry{}
 	}
+	if u.childErr == nil {
+		u.childErr = map[string]error{}
+	}
+	if u.expanded == nil {
+		u.expanded = map[string]bool{}
+	}
+	if u.loadingDirs == nil {
+		u.loadingDirs = map[string]bool{}
+	}
+}
+
+func (u *Usage) flattenUsageRows(filter string) []usageEntry {
 	out := make([]usageEntry, 0, len(u.entries))
 	for _, e := range u.entries {
-		if MatchesAll(u.base.FilterValue(), e.Name, e.Path) {
-			out = append(out, e)
+		out = append(out, u.flattenUsageEntry(e, 0, filter)...)
+	}
+	return out
+}
+
+func (u *Usage) flattenUsageEntry(e usageEntry, level int, filter string) []usageEntry {
+	row := e
+	row.Level = level
+	row.Status = ""
+	childRows := u.flattenUsageChildren(e.Path, level+1, filter)
+	selfMatch := filter == "" || MatchesAll(filter, row.Name, row.Path)
+	if filter != "" && !selfMatch && len(childRows) == 0 {
+		return nil
+	}
+	return append([]usageEntry{row}, childRows...)
+}
+
+func (u *Usage) flattenUsageChildren(parent string, level int, filter string) []usageEntry {
+	if !u.expanded[parent] {
+		return nil
+	}
+	var out []usageEntry
+	if filter == "" {
+		if u.loadingDirs[parent] {
+			out = append(out, usageEntry{Level: level, Status: "listing..."})
 		}
+		if err := u.childErr[parent]; err != nil {
+			out = append(out, usageEntry{Level: level, Status: err.Error(), Err: err})
+		}
+	}
+	children, ok := u.children[parent]
+	if !ok {
+		return out
+	}
+	if filter == "" && len(children) == 0 && !u.loadingDirs[parent] && u.childErr[parent] == nil {
+		out = append(out, usageEntry{Level: level, Status: "(empty)"})
+		return out
+	}
+	for _, child := range children {
+		out = append(out, u.flattenUsageEntry(child, level, filter)...)
 	}
 	return out
 }
@@ -410,10 +541,10 @@ func (u *Usage) viewRows() []usageEntry {
 	if !u.extensionM {
 		return u.dirRows()
 	}
-	// Extension mode: aggregate file extensions of files at this level.
+	// Extension mode: aggregate file extensions of visible files.
 	totals := map[string]*usageEntry{}
-	for _, e := range u.entries {
-		if e.IsDir {
+	for _, e := range u.flattenUsageRows("") {
+		if e.IsDir || e.Status != "" {
 			continue
 		}
 		ext := strings.ToLower(path.Ext(e.Name))
@@ -449,7 +580,7 @@ func (u *Usage) Render(width, height int) string {
 	parts = append(parts, u.renderBreadcrumb(width))
 	parts = append(parts, u.renderEntries(width)...)
 	parts = append(parts, "")
-	help := "  ⏎ drill in · ⌫ up · e ext breakdown · R re-size · / filter"
+	help := "  ⏎ expand · ⌫ collapse · e ext breakdown · R re-size · / filter"
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(help))
 	if f := u.base.FilterFooter(t); f != "" {
 		parts = append(parts, f)
@@ -461,50 +592,25 @@ func (u *Usage) renderBreadcrumb(width int) string {
 	t := u.ctx.Theme
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	accent := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-	if u.cwd == "" {
-		return accent.Render(" usage / ") + muted.Render("(pick a share to drill in)")
-	}
-	parts := []string{accent.Render(" usage / ")}
-	segs := strings.Split(strings.TrimPrefix(u.cwd, "/"), "/")
-	for i, s := range segs {
-		if s == "" {
-			continue
-		}
-		if i == len(segs)-1 {
-			parts = append(parts, accent.Render(s))
-		} else {
-			parts = append(parts, muted.Render(s), muted.Render(" › "))
-		}
-	}
 	_ = width
-	return strings.Join(parts, "")
+	return accent.Render(" usage / ") + muted.Render("(usage tree)")
 }
 
-// renderEntries renders u.entries with proportional size bars. At root
-// (u.cwd == "") the entries are shares; deeper down they're files +
-// folders. The "Sizing…" placeholder shows for in-flight DirSize calls.
+// renderEntries renders the flattened usage tree with proportional size bars.
+// The "Sizing…" placeholder shows for in-flight DirSize calls.
 func (u *Usage) renderEntries(width int) []string {
 	t := u.ctx.Theme
 	rows := u.viewRows()
-	title := "Children"
-	var loadErr error = u.err
-	if u.cwd == "" {
-		title = "Shares (largest first)"
-		loadErr = u.rootsErr
-	}
+	title := "Tree (largest first)"
 	if u.extensionM {
 		title += " · by extension"
 	}
-	out := []string{sectionHeader(t, width, title, len(rows), loadErr)}
-	if u.cwd == "" && u.roots == nil && u.rootsErr == nil {
+	out := []string{sectionHeader(t, width, title, len(rows), u.rootsErr)}
+	if u.roots == nil && u.rootsErr == nil {
 		out = append(out, "  "+muted(t, "loading shares…"))
 		return out
 	}
-	if u.cwd != "" && u.loading && len(rows) == 0 {
-		out = append(out, "  "+muted(t, "listing…"))
-		return out
-	}
-	if !u.loading && len(rows) == 0 {
+	if len(rows) == 0 {
 		out = append(out, "  "+muted(t, "(empty)"))
 		return out
 	}
@@ -519,58 +625,10 @@ func (u *Usage) renderEntries(width int) []string {
 	}
 	// Footer summary.
 	var total int64
-	var sizing int
 	for _, e := range u.entries {
 		total += e.Size
-		if e.Sizing {
-			sizing++
-		}
 	}
-	summary := fmt.Sprintf("  total %s · %d items · %d sizing", HumanBytes(uint64(total)), len(u.entries), sizing)
-	out = append(out, "", lipgloss.NewStyle().Foreground(t.Muted).Render(summary))
-	return out
-}
-
-func (u *Usage) renderDir(width int) []string {
-	t := u.ctx.Theme
-	rows := u.viewRows()
-	titleSfx := ""
-	if u.extensionM {
-		titleSfx = " · by extension"
-	}
-	header := sectionHeader(t, width, "Children"+titleSfx, len(rows), u.err)
-	out := []string{header}
-	if u.loading && len(rows) == 0 {
-		out = append(out, "  "+muted(t, "listing…"))
-		return out
-	}
-	if !u.loading && len(rows) == 0 {
-		out = append(out, "  "+muted(t, "(empty)"))
-		return out
-	}
-	// Compute max known size for bars (including in-flight ones use prior size 0 → fine).
-	var maxSize int64
-	for _, e := range rows {
-		if e.Size > maxSize {
-			maxSize = e.Size
-		}
-	}
-	for i, e := range rows {
-		out = append(out, u.renderDirRow(width, e, maxSize, i == u.base.Cursor()))
-	}
-	// Footer summary.
-	var total int64
-	var sized, sizing int
-	for _, e := range u.entries {
-		total += e.Size
-		if e.Sized {
-			sized++
-		}
-		if e.Sizing {
-			sizing++
-		}
-	}
-	summary := fmt.Sprintf("  total %s · %d items · %d sizing", HumanBytes(uint64(total)), len(u.entries), sizing)
+	summary := fmt.Sprintf("  total %s · %d rows · %d sizing", HumanBytes(uint64(total)), len(rows), u.countSizing())
 	out = append(out, "", lipgloss.NewStyle().Foreground(t.Muted).Render(summary))
 	return out
 }
@@ -580,13 +638,30 @@ func (u *Usage) renderDirRow(width int, e usageEntry, maxSize int64, highlight b
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
 	accent := lipgloss.NewStyle().Foreground(t.Accent2).Bold(true)
+	indent := strings.Repeat("  ", e.Level)
+	if e.Status != "" {
+		style := muted
+		if e.Err != nil {
+			style = lipgloss.NewStyle().Foreground(t.Error)
+		}
+		return lipgloss.JoinHorizontal(lipgloss.Center,
+			caretGlyph(t, highlight), " ",
+			indent, "  ", style.Render(e.Status),
+		)
+	}
 	barW := max(width-60, 20)
 	ratio := 0.0
 	if maxSize > 0 {
 		ratio = float64(e.Size) / float64(maxSize)
 	}
+	expander := " "
 	icon := "  "
 	if e.IsDir {
+		if u.expanded[e.Path] {
+			expander = "▾"
+		} else {
+			expander = "▸"
+		}
 		icon = "📁"
 	} else if e.Ext != "" {
 		icon = "·"
@@ -610,9 +685,11 @@ func (u *Usage) renderDirRow(width int, e usageEntry, maxSize int64, highlight b
 	case e.Sized:
 		size = text.Render(HumanBytes(uint64(e.Size)))
 	}
+	nameWidth := max(36-e.Level*2, 14)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
-		caretGlyph(t, highlight), " ", icon, " ",
-		padRight(name, 36), " ",
+		caretGlyph(t, highlight), " ",
+		indent, expander, " ", icon, " ",
+		padRight(name, nameWidth), " ",
 		Gauge(t, barW, ratio), " ",
 		padLeft(size, 12),
 	)
@@ -628,6 +705,9 @@ func (u *Usage) Inspect(width, height int) string {
 		return ""
 	}
 	e := rows[u.base.Cursor()]
+	if e.Status != "" {
+		return muted.Render(e.Status)
+	}
 	parts := []string{
 		t.Title().Render(" " + e.Name + " "),
 		"",

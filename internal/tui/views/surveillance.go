@@ -49,6 +49,7 @@ func (v *SurveillanceView) Title() string                  { return "Cameras" }
 func (v *SurveillanceView) Icon() string                   { return "◉" }
 func (v *SurveillanceView) RefreshInterval() time.Duration { return 30 * time.Second }
 func (v *SurveillanceView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *SurveillanceView) IsTextEditing() bool            { return v.filter.IsActive() }
 
 func (v *SurveillanceView) Init() tea.Cmd {
 	return tea.Batch(v.fetchCams(), v.fetchInfo())
@@ -96,7 +97,11 @@ func (v *SurveillanceView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -126,6 +131,7 @@ func (v *SurveillanceView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()
