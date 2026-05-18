@@ -72,6 +72,17 @@ func Onboard(ctx context.Context, cfg *config.Config) (*config.Profile, error) {
 	}
 
 	// 5. Persist.
+	//
+	// DSM returns the device token under "did" on some firmware
+	// (modern DSM 7.2) and "device_id" on others (DSM 7.0.1, the
+	// reference device for this project). Without coalescing both
+	// fields here, profile.DeviceID can end up empty even though the
+	// server happily issued a token — and every subsequent launch
+	// then asks for OTP again, triggering an unwanted re-onboard.
+	did := resp.DID
+	if did == "" {
+		did = resp.DeviceID
+	}
 	profile := config.Profile{
 		Name:     pick.name,
 		Host:     pick.host,
@@ -79,7 +90,7 @@ func Onboard(ctx context.Context, cfg *config.Config) (*config.Profile, error) {
 		Scheme:   scheme,
 		Username: creds.user,
 		Insecure: pick.insecure,
-		DeviceID: resp.DID,
+		DeviceID: did,
 	}
 	cfg.Upsert(profile)
 	if cfg.Default == "" {
@@ -137,6 +148,13 @@ func successBanner(p config.Profile) {
 	fmt.Println(ok + lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Render("Saved profile ") +
 		lipgloss.NewStyle().Foreground(accentBlue).Bold(true).Render(p.Name) +
 		lipgloss.NewStyle().Foreground(muted).Render("  ("+p.Username+"@"+p.Host+")"))
+	if p.DeviceID != "" {
+		fmt.Println(lipgloss.NewStyle().Foreground(muted).Render(
+			"   device token captured — next launch will skip the OTP prompt"))
+	} else {
+		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")).Render(
+			"   ⚠ no device token returned — next launch will ask for OTP again"))
+	}
 	fmt.Println()
 }
 
@@ -306,7 +324,12 @@ func loginWithFallback(ctx context.Context, pick *onboardingPick, creds *credent
 					OTP:        creds.otp,
 					DeviceName: "synoctl-" + hostnameOr("local"),
 				})
-				_ = client.Logout(deadline)
+				// Intentionally no Logout here. The verification login
+				// is the same session the user will continue with, and
+				// some DSM firmwares revoke the device token when the
+				// SID is closed too aggressively — leaving the user
+				// re-onboarding every launch. The server-side session
+				// expires on its own after a few minutes of inactivity.
 			}).
 			Run()
 		if spinErr != nil {
