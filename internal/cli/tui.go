@@ -104,10 +104,12 @@ func startTUI(parentCtx context.Context) error {
 			views.NewFiles(vctx),
 			views.NewUsage(vctx),
 			views.NewQuotas(vctx),
+			views.NewISCSI(vctx),
 		}},
 		{Name: "Apps", Views: []tui.View{
 			views.NewApps(vctx),
 			views.NewContainers(vctx),
+			views.NewVMM(vctx),
 		}},
 		{Name: "Backup", Views: []tui.View{
 			views.NewHyperBackup(vctx),
