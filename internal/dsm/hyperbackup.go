@@ -2,7 +2,9 @@ package dsm
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // BackupTask is one entry from SYNO.Backup.Task.list — a Hyper Backup
@@ -59,4 +61,52 @@ func (c *Client) BackupTasks(ctx context.Context) ([]BackupTask, error) {
 		}
 	}
 	return resp.Tasks, nil
+}
+
+// RunBackupTask kicks off a Hyper Backup task immediately. Endpoint is
+// SYNO.Backup.Task v1 `backup_now`. Older Hyper Backup firmwares (2.x)
+// don't advertise that method name and instead expect `start`; we try
+// the modern verb first and fall back when DSM reports code 103 (method
+// not found) or 104 (version not supported). The DSM call has no
+// payload beyond the task_id.
+func (c *Client) RunBackupTask(ctx context.Context, taskID int) error {
+	if taskID <= 0 {
+		return fmt.Errorf("dsm: backup task id is required")
+	}
+	const api = "SYNO.Backup.Task"
+	params := url.Values{}
+	params.Set("task_id", strconv.Itoa(taskID))
+	err := c.Call(ctx, api, 1, "backup_now", params, nil)
+	if err == nil {
+		return nil
+	}
+	if e, ok := err.(*Error); ok && (e.Code == 103 || e.Code == 104) {
+		return c.Call(ctx, api, 1, "start", params, nil)
+	}
+	return err
+}
+
+// SuspendBackupTask pauses an in-flight or scheduled Hyper Backup task.
+// Endpoint is SYNO.Backup.Task v1 `suspend`. Pairs with ResumeBackupTask;
+// DSM keeps the task in a suspended state until explicitly resumed.
+func (c *Client) SuspendBackupTask(ctx context.Context, taskID int) error {
+	if taskID <= 0 {
+		return fmt.Errorf("dsm: backup task id is required")
+	}
+	params := url.Values{}
+	params.Set("task_id", strconv.Itoa(taskID))
+	return c.Call(ctx, "SYNO.Backup.Task", 1, "suspend", params, nil)
+}
+
+// ResumeBackupTask un-pauses a previously suspended Hyper Backup task.
+// Endpoint is SYNO.Backup.Task v1 `resume`. The companion to
+// SuspendBackupTask — DSM will pick the task back up from where it left
+// off.
+func (c *Client) ResumeBackupTask(ctx context.Context, taskID int) error {
+	if taskID <= 0 {
+		return fmt.Errorf("dsm: backup task id is required")
+	}
+	params := url.Values{}
+	params.Set("task_id", strconv.Itoa(taskID))
+	return c.Call(ctx, "SYNO.Backup.Task", 1, "resume", params, nil)
 }

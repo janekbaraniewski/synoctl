@@ -86,7 +86,12 @@ func (s *Server) handlers() map[string]handlerFn {
 
 		// — backup —
 		"SYNO.Backup.Task:list":          s.handleHyperBackup,
+		"SYNO.Backup.Task:backup_now":    noopOK,
+		"SYNO.Backup.Task:suspend":       noopOK,
+		"SYNO.Backup.Task:resume":        noopOK,
 		"SYNO.ActiveBackup.Task:list":    s.handleActiveBackup,
+		"SYNO.ActiveBackup.Task:backup":  noopOK,
+		"SYNO.ActiveBackup.Task:cancel":  noopOK,
 		"SYNO.ActiveBackup.Version:list": s.handleActiveBackupVersions,
 		"SYNO.CloudSync:list":            s.handleCloudSync,
 

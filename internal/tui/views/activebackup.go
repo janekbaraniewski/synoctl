@@ -18,6 +18,12 @@ import (
 // latest snapshot. We fetch the most recent ABVersion lazily — only
 // when the cursor lands on a row — to avoid an O(tasks) call burst on
 // every refresh.
+//
+// Write actions: `X` runs the task immediately (SYNO.ActiveBackup.Task
+// `backup`), `C` cancels the running task (SYNO.ActiveBackup.Task
+// `cancel`). Both go through a confirm modal; ABB doesn't have a
+// suspend/resume pair (unlike Hyper Backup), so cancel is the only
+// stop-style action we expose.
 
 type abTasksMsg struct {
 	T   []dsm.ABTask
@@ -26,6 +32,16 @@ type abTasksMsg struct {
 type abVersionsMsg struct {
 	TaskID int
 	V      []dsm.ABVersion
+	Err    error
+}
+
+// abActionMsg carries the outcome of an Active Backup write back to
+// Update(). Kind is "run" / "cancel" — matches the confirm-modal token
+// prefix.
+type abActionMsg struct {
+	Kind   string
+	TaskID int
+	Name   string
 	Err    error
 }
 
@@ -43,17 +59,39 @@ type ActiveBackupView struct {
 	loaded bool
 
 	detail *dsm.ABTask
+
+	confirm *Confirm
+	flash   string
 }
 
 func NewActiveBackup(c Ctx) tui.View {
-	return &ActiveBackupView{ctx: c, latest: map[int]*dsm.ABVersion{}}
+	return &ActiveBackupView{
+		ctx:     c,
+		latest:  map[int]*dsm.ABVersion{},
+		confirm: NewConfirm(c.Theme),
+	}
 }
 
 func (v *ActiveBackupView) Name() string                   { return "activebackup" }
 func (v *ActiveBackupView) Title() string                  { return "Active Backup" }
 func (v *ActiveBackupView) Icon() string                   { return "⬇" }
 func (v *ActiveBackupView) RefreshInterval() time.Duration { return 60 * time.Second }
-func (v *ActiveBackupView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *ActiveBackupView) Bindings() []key.Binding {
+	return append(BaseBindings(),
+		key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "run now")),
+		key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "cancel")),
+	)
+}
+
+// Hint feeds the global hint strip. Mirrors the keys Update() handles.
+func (v *ActiveBackupView) Hint() string {
+	return "⏎ details · X run · C cancel · / filter · r refresh"
+}
+
+// IsTextEditing defers global keys (q quit, /, etc.) to the confirm
+// modal while it's open — y/n must reach the modal, not trigger the
+// global quit handler.
+func (v *ActiveBackupView) IsTextEditing() bool { return v.confirm.Open() }
 
 func (v *ActiveBackupView) Init() tea.Cmd { return v.fetchTasks() }
 
@@ -79,6 +117,36 @@ func (v *ActiveBackupView) fetchVersions(taskID int) tea.Cmd {
 	)
 }
 
+func (v *ActiveBackupView) runCmd(taskID int, name string) tea.Cmd {
+	c := v.ctx.Client
+	if c == nil {
+		return nil
+	}
+	return tui.Fetch(30*time.Second,
+		func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, c.RunABTask(ctx, taskID)
+		},
+		func(_ struct{}, err error) tea.Msg {
+			return abActionMsg{Kind: "run", TaskID: taskID, Name: name, Err: err}
+		},
+	)
+}
+
+func (v *ActiveBackupView) cancelCmd(taskID int, name string) tea.Cmd {
+	c := v.ctx.Client
+	if c == nil {
+		return nil
+	}
+	return tui.Fetch(30*time.Second,
+		func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, c.CancelABTask(ctx, taskID)
+		},
+		func(_ struct{}, err error) tea.Msg {
+			return abActionMsg{Kind: "cancel", TaskID: taskID, Name: name, Err: err}
+		},
+	)
+}
+
 func (v *ActiveBackupView) filtered() []dsm.ABTask {
 	if v.filter.Value() == "" {
 		return v.tasks
@@ -93,6 +161,42 @@ func (v *ActiveBackupView) filtered() []dsm.ABTask {
 }
 
 func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
+	// Confirm modal claims input first.
+	if handled, cmd := v.confirm.Update(msg); handled {
+		return v, cmd
+	}
+	switch m := msg.(type) {
+	case ConfirmedMsg:
+		// Token shape: "<kind>:<taskID>:<name>" — same routing as
+		// HyperBackupView, see splitToken / splitTaskToken there.
+		if kind, rest, ok := splitToken(m.Token, ':'); ok {
+			id, name := splitTaskToken(rest)
+			switch kind {
+			case "run":
+				v.flash = fmt.Sprintf("running %s…", name)
+				return v, v.runCmd(id, name)
+			case "cancel":
+				v.flash = fmt.Sprintf("cancelling %s…", name)
+				return v, v.cancelCmd(id, name)
+			}
+		}
+	case CancelledMsg:
+		v.flash = "cancelled"
+		return v, nil
+	case abActionMsg:
+		if m.Err != nil {
+			v.flash = fmt.Sprintf("%s failed: %s", m.Kind, m.Err.Error())
+		} else {
+			switch m.Kind {
+			case "run":
+				v.flash = fmt.Sprintf("%s started", m.Name)
+			case "cancel":
+				v.flash = fmt.Sprintf("%s cancelled", m.Name)
+			}
+		}
+		return v, v.fetchTasks()
+	}
+
 	if v.detail != nil {
 		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
 			v.detail = nil
@@ -166,6 +270,20 @@ func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			if tk, ok := v.currentTask(); ok {
 				v.detail = &tk
 			}
+		case "X":
+			if tk, ok := v.currentTask(); ok {
+				v.confirm.Ask(
+					fmt.Sprintf("run:%d:%s", tk.TaskID, tk.Name),
+					fmt.Sprintf("Run Active Backup task %s now?", tk.Name),
+					"It may use significant bandwidth and load the source for the duration of the backup.")
+			}
+		case "C":
+			if tk, ok := v.currentTask(); ok {
+				v.confirm.Ask(
+					fmt.Sprintf("cancel:%d:%s", tk.TaskID, tk.Name),
+					fmt.Sprintf("Cancel Active Backup task %s?", tk.Name),
+					"Stops the in-flight backup. The task remains scheduled.")
+			}
 		}
 	}
 	return v, nil
@@ -191,6 +309,9 @@ func (v *ActiveBackupView) clampCursor() {
 
 func (v *ActiveBackupView) Render(width, height int) string {
 	t := v.ctx.Theme
+	if v.confirm.Open() {
+		return v.confirm.Render(width, height)
+	}
 	if v.detail != nil {
 		return renderABTaskDetail(t, width, *v.detail, v.latest[v.detail.TaskID])
 	}
@@ -215,7 +336,10 @@ func (v *ActiveBackupView) Render(width, height int) string {
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
+		"  ↑/↓ move · ⏎ details · X run · C cancel · / filter · esc clear · r refresh"))
+	if v.flash != "" {
+		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+v.flash))
+	}
 	if fr := v.filter.Render(t); fr != "" {
 		parts = append(parts, fr)
 	}
@@ -323,6 +447,6 @@ func renderABTaskDetail(t tui.Theme, width int, tk dsm.ABTask, latest *dsm.ABVer
 			{"Note", latest.Note},
 		}))
 	}
-	parts = append(parts, noteCard(t, width, "  esc to go back · ABB write actions aren't wired up yet"))
+	parts = append(parts, noteCard(t, width, "  esc to go back · X run · C cancel"))
 	return strings.Join(parts, "\n")
 }

@@ -2,6 +2,7 @@ package dsm
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 )
@@ -85,4 +86,38 @@ func (c *Client) ABVersions(ctx context.Context, taskID int) ([]ABVersion, error
 		return nil, err
 	}
 	return resp.Versions, nil
+}
+
+// RunABTask kicks off an Active Backup for Business task. Endpoint is
+// SYNO.ActiveBackup.Task v1 `backup`. Some ABB builds expose the same
+// action as `run` instead, so we try the documented verb first and fall
+// back when DSM reports code 103 (method missing) or 104 (version not
+// supported). The DSM call has no payload beyond the task_id.
+func (c *Client) RunABTask(ctx context.Context, taskID int) error {
+	if taskID <= 0 {
+		return fmt.Errorf("dsm: active backup task id is required")
+	}
+	const api = "SYNO.ActiveBackup.Task"
+	params := url.Values{}
+	params.Set("task_id", strconv.Itoa(taskID))
+	err := c.Call(ctx, api, 1, "backup", params, nil)
+	if err == nil {
+		return nil
+	}
+	if e, ok := err.(*Error); ok && (e.Code == 103 || e.Code == 104) {
+		return c.Call(ctx, api, 1, "run", params, nil)
+	}
+	return err
+}
+
+// CancelABTask cancels an in-flight Active Backup for Business task.
+// Endpoint is SYNO.ActiveBackup.Task v1 `cancel`. ABB has no separate
+// suspend/resume — cancel returns the task to its scheduled-only state.
+func (c *Client) CancelABTask(ctx context.Context, taskID int) error {
+	if taskID <= 0 {
+		return fmt.Errorf("dsm: active backup task id is required")
+	}
+	params := url.Values{}
+	params.Set("task_id", strconv.Itoa(taskID))
+	return c.Call(ctx, "SYNO.ActiveBackup.Task", 1, "cancel", params, nil)
 }

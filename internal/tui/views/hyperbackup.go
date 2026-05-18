@@ -16,10 +16,27 @@ import (
 
 // HyperBackupView lists Hyper Backup tasks. Refresh is 60s — backup
 // state moves on a human cadence, so spamming the API would be silly.
+//
+// Beyond listing, the view exposes three write actions routed through a
+// confirm modal: `X` runs the task immediately, `p` suspends an
+// in-flight task, and `R` resumes a previously suspended task. All
+// three are token-gated through the same Confirm so a single yes/no
+// pair handles every mutation.
 
 type backupTasksMsg struct {
 	T   []dsm.BackupTask
 	Err error
+}
+
+// backupActionMsg carries the outcome of a Hyper Backup write call back
+// to Update(). Kind is "run" / "suspend" / "resume" and matches the
+// confirm-modal token prefix so the flash text can describe what just
+// happened (or failed).
+type backupActionMsg struct {
+	Kind   string
+	TaskID int
+	Name   string
+	Err    error
 }
 
 type HyperBackupView struct {
@@ -33,15 +50,37 @@ type HyperBackupView struct {
 	loaded bool
 
 	detail *dsm.BackupTask
+
+	confirm *Confirm
+	flash   string
 }
 
-func NewHyperBackup(c Ctx) tui.View { return &HyperBackupView{ctx: c} }
+func NewHyperBackup(c Ctx) tui.View {
+	return &HyperBackupView{ctx: c, confirm: NewConfirm(c.Theme)}
+}
 
 func (v *HyperBackupView) Name() string                   { return "backup" }
 func (v *HyperBackupView) Title() string                  { return "Hyper Backup" }
 func (v *HyperBackupView) Icon() string                   { return "⏏" }
 func (v *HyperBackupView) RefreshInterval() time.Duration { return 60 * time.Second }
-func (v *HyperBackupView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *HyperBackupView) Bindings() []key.Binding {
+	return append(BaseBindings(),
+		key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "run now")),
+		key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "suspend")),
+		key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resume")),
+	)
+}
+
+// Hint feeds the global hint strip at the bottom of the screen. The
+// keys advertised here mirror what Update() actually handles.
+func (v *HyperBackupView) Hint() string {
+	return "⏎ details · X run · p suspend · R resume · / filter · r refresh"
+}
+
+// IsTextEditing defers global keys (q quit, /, etc.) to the confirm
+// modal while it's owning input. Without this, "y" or "n" would also
+// trigger the global filter or quit handlers.
+func (v *HyperBackupView) IsTextEditing() bool { return v.confirm.Open() }
 
 func (v *HyperBackupView) Init() tea.Cmd { return v.fetchTasks() }
 
@@ -53,6 +92,55 @@ func (v *HyperBackupView) fetchTasks() tea.Cmd {
 	return tui.Fetch(15*time.Second,
 		func(ctx context.Context) ([]dsm.BackupTask, error) { return c.BackupTasks(ctx) },
 		func(x []dsm.BackupTask, err error) tea.Msg { return backupTasksMsg{T: x, Err: err} },
+	)
+}
+
+// runCmd / suspendCmd / resumeCmd wrap the three DSM mutations in a
+// uniform tea.Cmd shape so the Update loop can dispatch them by
+// confirm-token without each branch duplicating the Fetch boilerplate.
+
+func (v *HyperBackupView) runCmd(taskID int, name string) tea.Cmd {
+	c := v.ctx.Client
+	if c == nil {
+		return nil
+	}
+	return tui.Fetch(30*time.Second,
+		func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, c.RunBackupTask(ctx, taskID)
+		},
+		func(_ struct{}, err error) tea.Msg {
+			return backupActionMsg{Kind: "run", TaskID: taskID, Name: name, Err: err}
+		},
+	)
+}
+
+func (v *HyperBackupView) suspendCmd(taskID int, name string) tea.Cmd {
+	c := v.ctx.Client
+	if c == nil {
+		return nil
+	}
+	return tui.Fetch(30*time.Second,
+		func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, c.SuspendBackupTask(ctx, taskID)
+		},
+		func(_ struct{}, err error) tea.Msg {
+			return backupActionMsg{Kind: "suspend", TaskID: taskID, Name: name, Err: err}
+		},
+	)
+}
+
+func (v *HyperBackupView) resumeCmd(taskID int, name string) tea.Cmd {
+	c := v.ctx.Client
+	if c == nil {
+		return nil
+	}
+	return tui.Fetch(30*time.Second,
+		func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, c.ResumeBackupTask(ctx, taskID)
+		},
+		func(_ struct{}, err error) tea.Msg {
+			return backupActionMsg{Kind: "resume", TaskID: taskID, Name: name, Err: err}
+		},
 	)
 }
 
@@ -69,7 +157,59 @@ func (v *HyperBackupView) filtered() []dsm.BackupTask {
 	return out
 }
 
+func (v *HyperBackupView) currentTask() (dsm.BackupTask, bool) {
+	rows := v.filtered()
+	if v.cursor < 0 || v.cursor >= len(rows) {
+		return dsm.BackupTask{}, false
+	}
+	return rows[v.cursor], true
+}
+
 func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
+	// Confirm modal claims input first — same pattern as Apps / Shares.
+	if handled, cmd := v.confirm.Update(msg); handled {
+		return v, cmd
+	}
+	switch m := msg.(type) {
+	case ConfirmedMsg:
+		// Token shape: "<kind>:<taskID>:<name>". Name is best-effort —
+		// the API only needs the ID, but we capture the name at the
+		// confirm moment so flash messages survive a list refresh.
+		if kind, rest, ok := splitToken(m.Token, ':'); ok {
+			id, name := splitTaskToken(rest)
+			switch kind {
+			case "run":
+				v.flash = fmt.Sprintf("running %s…", name)
+				return v, v.runCmd(id, name)
+			case "suspend":
+				v.flash = fmt.Sprintf("suspending %s…", name)
+				return v, v.suspendCmd(id, name)
+			case "resume":
+				v.flash = fmt.Sprintf("resuming %s…", name)
+				return v, v.resumeCmd(id, name)
+			}
+		}
+	case CancelledMsg:
+		v.flash = "cancelled"
+		return v, nil
+	case backupActionMsg:
+		if m.Err != nil {
+			v.flash = fmt.Sprintf("%s failed: %s", m.Kind, m.Err.Error())
+		} else {
+			switch m.Kind {
+			case "run":
+				v.flash = fmt.Sprintf("%s started", m.Name)
+			case "suspend":
+				v.flash = fmt.Sprintf("%s suspended", m.Name)
+			case "resume":
+				v.flash = fmt.Sprintf("%s resumed", m.Name)
+			}
+		}
+		// Pull the list so the user sees the new state without having
+		// to mash `r`.
+		return v, v.fetchTasks()
+	}
+
 	if v.detail != nil {
 		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
 			v.detail = nil
@@ -118,6 +258,27 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				t := rows[v.cursor]
 				v.detail = &t
 			}
+		case "X":
+			if tk, ok := v.currentTask(); ok {
+				v.confirm.Ask(
+					fmt.Sprintf("run:%d:%s", tk.TaskID, tk.Name),
+					fmt.Sprintf("Run backup task %s now?", tk.Name),
+					"It may use significant bandwidth and load the repository for the duration of the backup.")
+			}
+		case "p":
+			if tk, ok := v.currentTask(); ok {
+				v.confirm.Ask(
+					fmt.Sprintf("suspend:%d:%s", tk.TaskID, tk.Name),
+					fmt.Sprintf("Suspend backup task %s?", tk.Name),
+					"This pauses the task. It stays paused until you resume it.")
+			}
+		case "R":
+			if tk, ok := v.currentTask(); ok {
+				v.confirm.Ask(
+					fmt.Sprintf("resume:%d:%s", tk.TaskID, tk.Name),
+					fmt.Sprintf("Resume backup task %s?", tk.Name),
+					"The task picks up from where it was suspended.")
+			}
 		}
 	}
 	return v, nil
@@ -135,6 +296,9 @@ func (v *HyperBackupView) clampCursor() {
 
 func (v *HyperBackupView) Render(width, height int) string {
 	t := v.ctx.Theme
+	if v.confirm.Open() {
+		return v.confirm.Render(width, height)
+	}
 	if v.detail != nil {
 		return renderBackupTaskDetail(t, width, *v.detail)
 	}
@@ -159,7 +323,10 @@ func (v *HyperBackupView) Render(width, height int) string {
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
+		"  ↑/↓ move · ⏎ details · X run · p suspend · R resume · / filter · esc clear · r refresh"))
+	if v.flash != "" {
+		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+v.flash))
+	}
 	if fr := v.filter.Render(t); fr != "" {
 		parts = append(parts, fr)
 	}
@@ -250,6 +417,32 @@ func renderBackupTaskDetail(t tui.Theme, width int, tk dsm.BackupTask) string {
 		chip("enabled", tk.Enable.Bool()),
 		chip("encrypted", tk.Encrypted.Bool()),
 	}))
-	parts = append(parts, noteCard(t, width, "  esc to go back · Hyper Backup actions aren't wired up yet"))
+	parts = append(parts, noteCard(t, width, "  esc to go back · X run · p suspend · R resume"))
 	return strings.Join(parts, "\n")
+}
+
+// splitToken returns the prefix before sep, the rest, and ok if sep is
+// present. Used to peel "<kind>:<rest>" tokens routed through the
+// confirm modal.
+func splitToken(s string, sep byte) (string, string, bool) {
+	for i := 0; i < len(s); i++ {
+		if s[i] == sep {
+			return s[:i], s[i+1:], true
+		}
+	}
+	return "", "", false
+}
+
+// splitTaskToken parses "<taskID>:<name>" suffixes. Returns 0/"" on
+// malformed input; callers should treat that as "do nothing".
+func splitTaskToken(s string) (int, string) {
+	id := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == ':' {
+			fmt.Sscanf(s[:i], "%d", &id)
+			return id, s[i+1:]
+		}
+	}
+	fmt.Sscanf(s, "%d", &id)
+	return id, ""
 }
