@@ -8,6 +8,11 @@ name: release-please
 #
 # Result: the only manual step in the cut-a-release flow is reviewing
 # the auto-generated release PR.
+#
+# After release-please runs, refresh-release-prs nudges the open
+# release PR's head branch so it stays current with main and the
+# "branch is up to date" status check stays green without manual
+# clicks.
 
 on:
   push:
@@ -27,6 +32,18 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  refresh-release-prs:
+    needs: release-please
+    name: Update open release PR branches
+    uses: ./.github/workflows/refresh-pr-branches.yaml
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      labels: "autorelease: pending"
+    secrets:
+      branch_refresh_token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.AUTOMATION_TOKEN }}

@@ -1,0 +1,66 @@
+name: Broken link check
+
+# Walks the markdown files at the repo root + docs/ and verifies
+# external links still resolve. Runs on PRs that touch markdown so
+# rot is caught early, and once a day so scheduled checks catch URL
+# decay even when no PR is open.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.md"
+      - ".github/workflows/lychee.yaml"
+      - ".github/lychee.toml"
+  schedule:
+    - cron: "13 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  lychee:
+    name: Lychee
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Restore lychee cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .lycheecache
+          key: lychee-cache-${{ github.run_id }}
+          restore-keys: lychee-cache-
+
+      - name: Run lychee
+        id: lychee
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
+        with:
+          # Scan top-level repo markdown plus everything under docs/.
+          # Keeps the link-rot net wide enough to catch the maintainer
+          # references (branch-protection notes) and user-facing README
+          # without pulling in transient build artifacts.
+          args: >-
+            --cache
+            --max-cache-age 1d
+            --no-progress
+            --config .github/lychee.toml
+            "README.md"
+            "SECURITY.md"
+            "CHANGELOG.md"
+            "docs/**/*.md"
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open or update sticky issue on scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        uses: peter-evans/create-issue-from-file@fca9117c27cdc29c6c4db3b86c48e4115a786710 # v6.0.0
+        with:
+          title: "Broken links detected by lychee"
+          content-filepath: ./lychee/out.md
+          labels: |
+            bug
+            docs

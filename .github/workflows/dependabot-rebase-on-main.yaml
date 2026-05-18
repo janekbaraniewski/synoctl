@@ -1,0 +1,24 @@
+name: Dependabot rebase open PRs on main update
+
+# When main moves forward, ask Dependabot to refresh its open PRs
+# against the new tip. Mirrors the equivalent workflow in openusage:
+# delegates the actual work to refresh-dependabot-prs.yaml so the
+# script lives in one place.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  refresh-dependabot-prs:
+    name: Refresh open Dependabot PRs
+    uses: ./.github/workflows/refresh-dependabot-prs.yaml
+    secrets: inherit
+    permissions:
+      contents: read

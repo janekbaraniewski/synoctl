@@ -1,0 +1,157 @@
+name: Refresh PR branches
+
+# Reusable workflow that refreshes the head branches of the PRs
+# matching a label and/or author filter. release-please calls it
+# after each push to main to keep its open release PR (labelled
+# `autorelease: pending`) current with master.
+
+on:
+  workflow_call:
+    inputs:
+      author-login:
+        description: Only refresh PRs authored by this login.
+        required: false
+        type: string
+        default: ""
+      labels:
+        description: Comma-separated labels used to select PRs.
+        required: false
+        type: string
+        default: ""
+    secrets:
+      branch_refresh_token:
+        description: Token used for branch updates.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Refresh matching PR branches
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: refresh
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.branch_refresh_token || github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const authorLogin = process.env.AUTHOR_LOGIN.trim();
+            const labels = process.env.LABELS.trim();
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            const isAlreadyCurrent = (error) =>
+              error.status === 422 &&
+              /no new commits|not behind|up to date/i.test(error.message);
+
+            const isCurrent = (pull) =>
+              !['behind', 'dirty', 'unknown'].includes(pull.mergeable_state);
+
+            async function listPulls() {
+              if (!labels) {
+                return github.paginate(github.rest.pulls.list, {
+                  owner,
+                  repo,
+                  state: 'open',
+                  per_page: 100,
+                });
+              }
+
+              const issues = await github.paginate(github.rest.issues.listForRepo, {
+                owner,
+                repo,
+                state: 'open',
+                labels,
+                per_page: 100,
+              });
+              const pulls = [];
+              for (const issue of issues.filter((issue) => issue.pull_request)) {
+                const response = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: issue.number,
+                });
+                pulls.push(response.data);
+              }
+              return pulls;
+            }
+
+            async function getPull(pullNumber) {
+              const response = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pullNumber,
+              });
+              return response.data;
+            }
+
+            async function waitForCurrentBranch(pr, previousSha) {
+              let current = pr;
+              if ((!previousSha || current.head.sha !== previousSha) && isCurrent(current)) {
+                return current;
+              }
+
+              for (const delay of [2000, 3000, 5000, 10000, 15000, 25000]) {
+                await sleep(delay);
+                current = await getPull(pr.number);
+                if ((!previousSha || current.head.sha !== previousSha) && isCurrent(current)) {
+                  return current;
+                }
+              }
+              core.warning(`PR #${pr.number} branch update did not finish.`);
+              return current;
+            }
+
+            const pulls = (await listPulls()).filter((pull) =>
+              authorLogin ? pull.user?.login === authorLogin : true
+            );
+            let refreshed = 0;
+            const skipped = [];
+
+            for (const pull of pulls) {
+              core.startGroup(`PR #${pull.number}`);
+              try {
+                await github.rest.pulls.updateBranch({
+                  owner,
+                  repo,
+                  pull_number: pull.number,
+                  expected_head_sha: pull.head.sha,
+                });
+                const updated = await waitForCurrentBranch(pull, pull.head.sha);
+                if (isCurrent(updated)) {
+                  refreshed += 1;
+                  core.info(`Updated ${pull.head.ref}: ${pull.head.sha} -> ${updated.head.sha}`);
+                } else {
+                  skipped.push({ number: pull.number, ref: pull.head.ref, state: updated.mergeable_state });
+                }
+              } catch (error) {
+                if (isAlreadyCurrent(error)) {
+                  const current = await waitForCurrentBranch(pull, '');
+                  if (isCurrent(current)) {
+                    refreshed += 1;
+                    core.info(`${current.head.ref} is already current with main.`);
+                  } else {
+                    skipped.push({ number: pull.number, ref: pull.head.ref, state: current.mergeable_state });
+                    core.warning(`PR #${pull.number} is ${current.mergeable_state}; skipping branch refresh.`);
+                  }
+                } else {
+                  core.warning(`Could not update PR #${pull.number}: ${error.message}`);
+                  skipped.push({ number: pull.number, ref: pull.head.ref, state: pull.mergeable_state });
+                }
+              } finally {
+                core.endGroup();
+              }
+            }
+
+            if (skipped.length > 0) {
+              core.notice(`Skipped ${skipped.length} PR branch(es): ${JSON.stringify(skipped)}`);
+            }
+
+            core.notice(`Refreshed ${refreshed} PR branch(es).`);
+        env:
+          AUTHOR_LOGIN: ${{ inputs.author-login }}
+          LABELS: ${{ inputs.labels }}

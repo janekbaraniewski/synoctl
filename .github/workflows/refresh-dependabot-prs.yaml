@@ -1,0 +1,123 @@
+name: Refresh Dependabot PRs
+
+# Reusable workflow that walks every open Dependabot PR and asks
+# GitHub to update its head branch against main. Skips PRs that
+# already have manual commits or merge conflicts so a human still
+# gets to handle the tricky ones.
+
+on:
+  workflow_call:
+    secrets:
+      AUTOMATION_TOKEN:
+        description: User PAT or equivalent token with repo/write and workflow permission.
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Refresh open Dependabot PRs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.AUTOMATION_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+
+            if (!process.env.GH_TOKEN) {
+              core.setFailed('AUTOMATION_TOKEN is required. Use a PAT with repo and workflow scope, or an equivalent GitHub App token.');
+              return;
+            }
+
+            const isAlreadyCurrent = (error) =>
+              error.status === 422 &&
+              /no new commits|not behind|up to date/i.test(error.message);
+
+            const baseShaByRef = new Map();
+
+            async function latestBaseSha(pull) {
+              if (!baseShaByRef.has(pull.base.ref)) {
+                const response = await github.rest.repos.getBranch({
+                  owner,
+                  repo,
+                  branch: pull.base.ref,
+                });
+                baseShaByRef.set(pull.base.ref, response.data.commit.sha);
+              }
+              return baseShaByRef.get(pull.base.ref);
+            }
+
+            async function compareWithBase(pull) {
+              const baseSha = await latestBaseSha(pull);
+              const response = await github.rest.repos.compareCommitsWithBasehead({
+                owner,
+                repo,
+                basehead: `${baseSha}...${pull.head.sha}`,
+              });
+              return response.data;
+            }
+
+            async function hasNonDependabotCommits(pullNumber) {
+              const commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner,
+                repo,
+                pull_number: pullNumber,
+                per_page: 100,
+              });
+              return commits.some((commit) => commit.author?.login !== 'dependabot[bot]');
+            }
+
+            const pulls = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            for (const pullSummary of pulls.filter((pull) => pull.user?.login === 'dependabot[bot]')) {
+              core.startGroup(`PR #${pullSummary.number}`);
+              try {
+                const response = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: pullSummary.number,
+                });
+                const pull = response.data;
+
+                const hasExternalCommits = await hasNonDependabotCommits(pull.number);
+                if (pull.mergeable_state === 'dirty' || hasExternalCommits) {
+                  const reason = [
+                    pull.mergeable_state === 'dirty' ? 'merge conflicts' : '',
+                    hasExternalCommits ? 'non-Dependabot commits' : '',
+                  ].filter(Boolean).join(' and ');
+                  core.warning(`PR #${pull.number} requires manual attention (${reason}); skipping branch update.`);
+                  continue;
+                }
+
+                const comparison = await compareWithBase(pull);
+                if (comparison.behind_by === 0 && pull.mergeable_state !== 'behind') {
+                  core.info(`PR #${pull.number} is not behind main.`);
+                  continue;
+                }
+
+                await github.rest.pulls.updateBranch({
+                  owner,
+                  repo,
+                  pull_number: pull.number,
+                  expected_head_sha: pull.head.sha,
+                });
+                core.notice(`Requested branch update for PR #${pull.number}.`);
+              } catch (error) {
+                if (isAlreadyCurrent(error)) {
+                  core.info(`PR #${pullSummary.number} is already current with main.`);
+                } else {
+                  core.warning(`Could not refresh PR #${pullSummary.number}: ${error.message}`);
+                }
+              } finally {
+                core.endGroup();
+              }
+            }
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
