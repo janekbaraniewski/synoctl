@@ -32,6 +32,7 @@ for volumes, disks, shares, users, packages, services, and more.`,
 		newLogoutCmd(),
 		newAPIsCmd(),
 		newRawCmd(),
+		newDemoCmd(),
 		newVersionCmd(),
 	)
 	return root
