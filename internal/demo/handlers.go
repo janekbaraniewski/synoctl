@@ -3,6 +3,7 @@ package demo
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"net/url"
 	"strconv"
@@ -189,10 +190,33 @@ func (s *Server) handleSystemInfo(_ *Server, _ url.Values) any {
 	}
 }
 
-func (s *Server) handleUtilization(_ *Server, _ url.Values) any {
-	// Randomize within a plausible band so sparklines move during a
-	// demo session. The base values are chosen so screenshots look
-	// "alive but not stressed".
+func (s *Server) handleUtilization(_ *Server, form url.Values) any {
+	// SYNO.Core.System.Utilization.get takes a `type` parameter that
+	// selects between the live sample ("current", or unset) and one of
+	// the historical windows ("hour", "day", "week", "month", "year").
+	// The historical case returns an array of per-slot samples so the
+	// Resource Monitor view can draw a sparkline.
+	switch form.Get("type") {
+	case "", "current":
+		return demoLiveUtilization()
+	case "hour":
+		return demoUtilSeries(60)
+	case "day":
+		return demoUtilSeries(96)
+	case "week":
+		return demoUtilSeries(84)
+	case "month":
+		return demoUtilSeries(60)
+	case "year":
+		return demoUtilSeries(52)
+	default:
+		return demoLiveUtilization()
+	}
+}
+
+// demoLiveUtilization returns a single in-the-moment utilisation sample
+// with the "alive but not stressed" bias.
+func demoLiveUtilization() map[string]any {
 	cpuUser := 8 + rand.IntN(12)
 	cpuSys := 4 + rand.IntN(6)
 	cpuOther := 2 + rand.IntN(4)
@@ -246,6 +270,102 @@ func (s *Server) handleUtilization(_ *Server, _ url.Values) any {
 		},
 		"time": time.Now().Unix(),
 	}
+}
+
+// demoUtilSeries generates n per-slot samples in the modern "array of
+// Utilization" response shape. Values follow the same alive-but-not-
+// stressed bias as demoLiveUtilization, with a slow sinusoidal trend on
+// top of the per-slot noise so the resulting sparkline reads like real
+// activity rather than a flat random walk.
+func demoUtilSeries(n int) []map[string]any {
+	if n <= 0 {
+		n = 1
+	}
+	now := time.Now().Unix()
+	out := make([]map[string]any, n)
+	for i := 0; i < n; i++ {
+		// Sinusoidal bias 0..1 oscillating ~3 cycles across the window
+		// gives "calm → busy → calm" stripes that look alive in a chart.
+		phase := float64(i) / float64(n)
+		trend := 0.5 + 0.4*math.Sin(phase*2*math.Pi*3)
+
+		cpuUser := int(8 + trend*10 + float64(rand.IntN(6)))
+		cpuSys := int(4 + trend*4 + float64(rand.IntN(3)))
+		cpuOther := 2 + rand.IntN(4)
+		memUse := int(56 + trend*8 + float64(rand.IntN(3))) // %
+		rx := int64(1_500_000 + int64(trend*9_000_000) + int64(rand.IntN(1_200_000)))
+		tx := int64(300_000 + int64(trend*1_500_000) + int64(rand.IntN(400_000)))
+		diskUtil := int(15 + trend*45 + float64(rand.IntN(8)))
+
+		// Per-slot timestamp: oldest first, latest last.
+		slotTime := now - int64(float64(n-1-i)*sliceSecondsForCount(n))
+
+		out[i] = map[string]any{
+			"cpu": map[string]any{
+				"1min_load":   17,
+				"5min_load":   22,
+				"15min_load":  19,
+				"user_load":   cpuUser,
+				"system_load": cpuSys,
+				"other_load":  cpuOther,
+				"device":      "System",
+			},
+			"memory": map[string]any{
+				"avail_real":  2_950_000,
+				"avail_swap":  2_097_152,
+				"buffer":      384_000,
+				"cached":      1_584_000,
+				"memory_size": 8_388_608,
+				"real_usage":  memUse,
+				"si_disk":     0,
+				"so_disk":     0,
+				"swap_usage":  3,
+				"total_real":  8_388_608,
+				"total_swap":  2_097_152,
+				"device":      "Memory",
+			},
+			"network": []map[string]any{
+				{"device": "total", "rx": rx, "tx": tx},
+				{"device": "eth0", "rx": rx / 2, "tx": tx / 2},
+				{"device": "eth1", "rx": rx / 2, "tx": tx / 2},
+			},
+			"disk": map[string]any{
+				"total": map[string]any{
+					"device": "total", "read_access": 56, "write_access": 30,
+					"read_byte": 31_100_000, "write_byte": 10_900_000, "util": diskUtil,
+				},
+			},
+			"space": map[string]any{
+				"total": map[string]any{"device": "total", "util": diskUtil},
+			},
+			"time": slotTime,
+		}
+	}
+	return out
+}
+
+// sliceSecondsForCount returns a plausible "seconds per slot" so the
+// per-sample timestamps land in a sensible range. The Resource Monitor
+// doesn't use these timestamps today (the axis is fixed-label), but real
+// firmwares emit them and this keeps the demo payload faithful.
+func sliceSecondsForCount(n int) float64 {
+	switch {
+	case n >= 84 && n <= 96:
+		// Day window → 15-minute slots; week → ~2-hour slots.
+		if n == 96 {
+			return 15 * 60
+		}
+		return 2 * 3600
+	case n == 60:
+		// hour → 1-minute slots; month → 12-hour slots.
+		// Caller distinguishes by length; we can't tell, so split the
+		// difference (1 minute is fine — only used for the embedded
+		// time field, which the view ignores).
+		return 60
+	case n == 52:
+		return 7 * 86400 // year → 1-week slots
+	}
+	return 60
 }
 
 func (s *Server) handleProcessList(_ *Server, _ url.Values) any {

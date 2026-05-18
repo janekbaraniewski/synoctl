@@ -95,6 +95,7 @@ func runDemo(cmd *cobra.Command, _ []string) error {
 	sections := []tui.NavSection{
 		{Name: "Overview", Views: []tui.View{
 			views.NewDashboard(vctx),
+			views.NewResourceMonitor(vctx),
 		}},
 		{Name: "Storage", Views: []tui.View{
 			views.NewVolumes(vctx),
