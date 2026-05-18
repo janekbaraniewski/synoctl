@@ -44,11 +44,40 @@ checksum:
 snapshot:
   version_template: "{{ .Version }}-next"
 
-# Release body comes from the annotated-tag message (curated by hand
-# per release). The auto-generated SHA-prefixed changelog is suppressed.
+# Sigstore cosign keyless signing.
+#
+# Each release archive plus the checksums file gets a `.sigstore.json`
+# bundle attached to the release. Verification uses the GitHub Actions
+# OIDC identity that ran the workflow — no key management required.
+# To verify a downloaded artifact:
+#
+#   cosign verify-blob \
+#     --bundle synoctl_X.Y.Z_linux_amd64.tar.gz.sigstore.json \
+#     --certificate-identity-regexp 'https://github\.com/janekbaraniewski/synology-ctl/\.github/workflows/' \
+#     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+#     synoctl_X.Y.Z_linux_amd64.tar.gz
+signs:
+  - id: cosign-keyless
+    cmd: cosign
+    artifacts: all
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--yes"
+      - "--bundle=${signature}"
+      - "${artifact}"
+    output: true
+
+# goreleaser's own changelog generator is disabled — release-please
+# writes CHANGELOG.md from conventional commits and creates the GitHub
+# Release with that body. goreleaser appends the install + verify
+# footer below the release-please body so each release page is
+# self-documenting without manual editing.
+changelog:
+  disable: true
+
 release:
-  header: |
-    {{ .TagContents }}
+  mode: append
   footer: |
 
     ## Install
@@ -58,7 +87,16 @@ release:
     brew install synoctl
     ```
 
-    Or download a prebuilt binary from the assets below.
+    Or download a prebuilt binary from the assets below and drop it on `$PATH`.
 
-changelog:
-  disable: true
+    ### Verifying a binary
+
+    Every archive ships with a `.sigstore.json` bundle. Verify with:
+
+    ```bash
+    cosign verify-blob \
+      --bundle synoctl_{{ .Version }}_linux_amd64.tar.gz.sigstore.json \
+      --certificate-identity-regexp 'https://github\.com/janekbaraniewski/synology-ctl/\.github/workflows/' \
+      --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+      synoctl_{{ .Version }}_linux_amd64.tar.gz
+    ```

@@ -1,0 +1,32 @@
+name: release-please
+
+# release-please watches main for conventional commits, opens (and
+# refreshes) a "release PR" that bumps the version + regenerates
+# CHANGELOG.md. Merging that PR tags the commit and creates a GitHub
+# Release — which in turn triggers .github/workflows/release.yml to
+# attach signed binaries.
+#
+# Result: the only manual step in the cut-a-release flow is reviewing
+# the auto-generated release PR.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
