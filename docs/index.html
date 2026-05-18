@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#11161d">
+    <meta name="description" content="synoctl is a keyboard-first terminal control room for Synology DSM.">
+    <title>synoctl</title>
+    <style>
+      :root {
+        --bg: #0f141a;
+        --panel: #141a22;
+        --panel-2: #181f2a;
+        --text: #d7dce5;
+        --muted: #8d96a8;
+        --line: #2a3444;
+        --amber: #ffa70a;
+        --blue: #50bdf5;
+        --green: #65cf73;
+        --red: #ef6d78;
+        --shadow: rgba(0, 0, 0, 0.38);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--bg);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        letter-spacing: 0;
+        background:
+          linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px) 0 0 / 100% 32px,
+          radial-gradient(circle at top left, rgba(255,167,10,0.08), transparent 32rem),
+          var(--bg);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .shell {
+        width: min(1180px, calc(100vw - 28px));
+        margin: 24px auto;
+        border: 1px solid var(--line);
+        background: rgba(20, 26, 34, 0.94);
+        box-shadow: 0 24px 80px var(--shadow);
+      }
+
+      .bar {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .brand {
+        color: var(--text);
+        font-weight: 800;
+      }
+
+      .dot {
+        color: var(--green);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 210px 1fr;
+        min-height: calc(100vh - 74px);
+      }
+
+      nav {
+        border-right: 1px solid var(--line);
+        padding: 18px 18px 24px;
+      }
+
+      nav h2 {
+        margin: 18px 0 8px;
+        color: var(--amber);
+        font-size: 15px;
+        text-transform: uppercase;
+      }
+
+      nav h2:first-child {
+        margin-top: 0;
+      }
+
+      nav p {
+        margin: 4px 0;
+        color: var(--muted);
+      }
+
+      nav .on {
+        color: var(--text);
+      }
+
+      main {
+        padding: 28px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+        gap: 28px;
+        align-items: start;
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        color: var(--amber);
+        font-size: clamp(34px, 6vw, 74px);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 690px;
+        margin: 0 0 24px;
+        color: var(--text);
+        font-size: clamp(17px, 2.2vw, 24px);
+        line-height: 1.35;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 24px 0;
+      }
+
+      .button {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        padding: 9px 12px;
+        color: var(--text);
+      }
+
+      .button.primary {
+        color: #11161d;
+        background: var(--amber);
+        border-color: var(--amber);
+        font-weight: 800;
+      }
+
+      .window {
+        border: 1px solid var(--line);
+        background: #10161d;
+      }
+
+      .window-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px;
+        overflow: auto;
+        color: var(--text);
+      }
+
+      .blue {
+        color: var(--blue);
+      }
+
+      .green {
+        color: var(--green);
+      }
+
+      .red {
+        color: var(--red);
+      }
+
+      .amber {
+        color: var(--amber);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        padding: 14px;
+        min-height: 138px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        color: var(--amber);
+        font-size: 16px;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .install {
+        margin-top: 28px;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 28px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 860px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        nav {
+          display: none;
+        }
+
+        main {
+          padding: 18px;
+        }
+
+        .hero,
+        .cards {
+          grid-template-columns: 1fr;
+        }
+
+        .shell {
+          width: calc(100vw - 16px);
+          margin: 8px auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="bar">
+        <span><span class="brand">synoctl</span> <span class="dot">*</span> DSM terminal cockpit</span>
+        <span>github.com/janekbaraniewski/synology-ctl</span>
+      </div>
+
+      <div class="grid">
+        <nav aria-label="Product sections">
+          <h2>Overview</h2>
+          <p class="on">> Dashboard</p>
+          <p>- Resource Monitor</p>
+          <h2>Storage</h2>
+          <p>| Storage Health</p>
+          <p class="on"># Shares &amp; Files</p>
+          <p>~ iSCSI</p>
+          <h2>Apps</h2>
+          <p>[] Apps</p>
+          <p>:: Containers</p>
+          <h2>System</h2>
+          <p>^ Admin</p>
+          <p>% Quotas</p>
+          <p>! Notifications</p>
+        </nav>
+
+        <main>
+          <section class="hero">
+            <div>
+              <p class="muted">jan@nas:~$ synoctl</p>
+              <h1>DSM, without the browser.</h1>
+              <p class="lead">
+                A keyboard-first control room for Synology NAS boxes:
+                storage, files, apps, backups, security, services, and raw DSM API calls
+                in one fast terminal interface.
+              </p>
+              <div class="actions">
+                <a class="button primary" href="https://github.com/janekbaraniewski/synology-ctl#install">install</a>
+                <a class="button" href="https://github.com/janekbaraniewski/synology-ctl">source</a>
+                <a class="button" href="https://github.com/janekbaraniewski/synology-ctl/releases">releases</a>
+              </div>
+              <p class="muted">
+                Auto-discovery, Keychain credentials, typed DSM clients, structured drill-downs,
+                and a built-in API explorer for firmware drift.
+              </p>
+            </div>
+
+            <div class="window" aria-label="Terminal preview">
+              <div class="window-title">
+                <span>storage / shares, files, usage</span>
+                <span>up 169d 21h</span>
+              </div>
+              <pre><span class="amber">Shared folders, files, usage</span>
+> [dir] photo       1.2 TiB  quota 63%
+> [dir] video       5.9 TiB  recycle
+v [dir] files       <span class="green">exact</span> 194 GiB
+  > [dir] docs       pending
+  > [dir] downloads  pending
+  - report.pdf       560 KiB
+  - clip.mp4         1.8 GiB
+
+<span class="amber">Apps</span>
+Active Insight        <span class="green">running</span>
+Container Manager     <span class="green">running</span>
+Media Server          <span class="green">running</span>
+Note Station          <span class="red">stop</span>
+
+<span class="blue">enter</span> expand/open | / filter | i inspector | : cmd</pre>
+            </div>
+          </section>
+
+          <section class="cards" aria-label="Highlights">
+            <article class="card">
+              <h3>Real file operations</h3>
+              <p>Browse File Station as a tree, calculate exact directory sizes, open or download files, rename, delete, and manage snapshots.</p>
+            </article>
+            <article class="card">
+              <h3>DSM drift tolerant</h3>
+              <p>Handles endpoint version changes, envelope shape drift, boolean weirdness, and package metadata differences across DSM builds.</p>
+            </article>
+            <article class="card">
+              <h3>Built for terminals</h3>
+              <p>Dense lists, live inspectors, contextual hints, confirmations for destructive actions, and no web-dashboard ceremony.</p>
+            </article>
+          </section>
+
+          <section class="install">
+            <div class="window">
+              <div class="window-title">
+                <span>install</span>
+                <span>macOS</span>
+              </div>
+              <pre>brew tap janekbaraniewski/tap
+brew install synoctl
+synoctl</pre>
+            </div>
+          </section>
+
+          <footer class="footer">
+            <span>MIT licensed.</span>
+            <span>made for people who prefer ssh panes to browser tabs.</span>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
