@@ -110,6 +110,7 @@ func runDemo(cmd *cobra.Command, _ []string) error {
 		{Name: "Backup", Views: []tui.View{
 			views.NewHyperBackup(vctx),
 			views.NewActiveBackup(vctx),
+			views.NewCloudSync(vctx),
 		}},
 		{Name: "Services", Views: []tui.View{
 			views.NewDrive(vctx),
