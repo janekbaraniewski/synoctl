@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.4](https://github.com/janekbaraniewski/synoctl/compare/v0.2.3...v0.2.4) (2026-05-18)
+
+
+### Features
+
+* **settings:** DSM update / time / power / external access views ([e8c0de0](https://github.com/janekbaraniewski/synoctl/commit/e8c0de07635f86026d6f7deba2f37f6cfdfd23e8))
+
+
+### Bug Fixes
+
+* **ci:** drop hard AUTOMATION_TOKEN requirement from dependabot refresh ([1b1ba69](https://github.com/janekbaraniewski/synoctl/commit/1b1ba69dcbb533fb3e47a9f9a77ba1935846b618))
+
 ## [0.2.3](https://github.com/janekbaraniewski/synoctl/compare/v0.2.2...v0.2.3) (2026-05-18)
 
 
