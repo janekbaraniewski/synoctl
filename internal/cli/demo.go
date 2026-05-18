@@ -99,11 +99,7 @@ func runDemo(cmd *cobra.Command, _ []string) error {
 		}},
 		{Name: "Storage", Views: []tui.View{
 			views.NewVolumes(vctx),
-			views.NewDisks(vctx),
-			views.NewShares(vctx),
 			views.NewFiles(vctx),
-			views.NewUsage(vctx),
-			views.NewQuotas(vctx),
 			views.NewISCSI(vctx),
 		}},
 		{Name: "Apps", Views: []tui.View{
@@ -127,6 +123,7 @@ func runDemo(cmd *cobra.Command, _ []string) error {
 		}},
 		{Name: "System", Views: []tui.View{
 			views.NewAdminPage(vctx),
+			views.NewQuotas(vctx),
 			views.NewSchedTasks(vctx),
 			views.NewDDNS(vctx),
 			views.NewNotifications(vctx),

@@ -35,7 +35,11 @@ func BaseBindings() []key.Binding {
 func (b *listBase) HandleKey(msg tea.Msg, rowCount int) (tea.Cmd, bool) {
 	// Filter editing swallows runes when open.
 	if b.filter.IsActive() {
+		before := b.filter.Value()
 		if b.filter.Update(msg) {
+			if b.filter.Value() != before {
+				b.cursor = 0
+			}
 			return nil, true
 		}
 		return nil, false
@@ -64,6 +68,7 @@ func (b *listBase) HandleKey(msg tea.Msg, rowCount int) (tea.Cmd, bool) {
 		return nil, true
 	case "/":
 		b.filter.Open()
+		b.cursor = 0
 		return nil, true
 	case "esc":
 		if b.filter.Value() != "" {

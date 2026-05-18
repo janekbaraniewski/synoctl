@@ -75,7 +75,7 @@ func (v *SchedTasksView) Bindings() []key.Binding {
 // run-now confirm modal owns input. Without it the y/n keys would
 // double-fire as global accelerators.
 func (v *SchedTasksView) IsTextEditing() bool {
-	return v.confirm.Open()
+	return v.confirm.Open() || v.filter.IsActive()
 }
 
 // Hint is the context-aware bottom-strip text. When the cursor is parked
@@ -204,7 +204,11 @@ func (v *SchedTasksView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -232,6 +236,7 @@ func (v *SchedTasksView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

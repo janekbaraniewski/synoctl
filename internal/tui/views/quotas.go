@@ -53,6 +53,7 @@ func (v *QuotasView) Title() string                  { return "Quotas" }
 func (v *QuotasView) Icon() string                   { return "⊞" }
 func (v *QuotasView) RefreshInterval() time.Duration { return 2 * time.Minute }
 func (v *QuotasView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *QuotasView) IsTextEditing() bool            { return v.filter.IsActive() }
 
 func (v *QuotasView) Init() tea.Cmd { return tea.Batch(v.fetchShares(), v.fetchUsers()) }
 
@@ -151,7 +152,11 @@ func (v *QuotasView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -183,6 +188,7 @@ func (v *QuotasView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.rows())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

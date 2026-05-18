@@ -50,6 +50,7 @@ func (v *CloudSyncView) Title() string                  { return "Cloud Sync" }
 func (v *CloudSyncView) Icon() string                   { return "☁" }
 func (v *CloudSyncView) RefreshInterval() time.Duration { return 60 * time.Second }
 func (v *CloudSyncView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *CloudSyncView) IsTextEditing() bool            { return v.filter.IsActive() }
 
 // Hint feeds the global hint strip at the bottom of the screen. The
 // keys advertised here mirror what Update() actually handles.
@@ -94,7 +95,11 @@ func (v *CloudSyncView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -122,6 +127,7 @@ func (v *CloudSyncView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

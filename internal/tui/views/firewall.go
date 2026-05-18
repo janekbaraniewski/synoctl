@@ -107,7 +107,7 @@ func (v *FirewallView) Bindings() []key.Binding {
 // IsTextEditing defers global keys while the form or confirm modal
 // owns input.
 func (v *FirewallView) IsTextEditing() bool {
-	return v.form.Open() || v.confirm.Open()
+	return v.form.Open() || v.confirm.Open() || v.filter.IsActive()
 }
 
 // Hint advertises the mutation keys when the cursor is over a rule row.
@@ -345,7 +345,11 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -387,6 +391,7 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.flatten())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

@@ -155,6 +155,11 @@ func (c *Client) RawCall(ctx context.Context, api string, version int, method st
 		}
 		return nil, "", fmt.Errorf("dsm: %s.%s: unexpected JSON response", api, method)
 	}
+	if ct := resp.Header.Get("Content-Type"); strings.Contains(ct, "text/html") {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
+		return nil, "", fmt.Errorf("dsm: %s.%s: unexpected HTML response: %s", api, method, truncate(string(body), 120))
+	}
 	return resp.Body, resp.Header.Get("Content-Disposition"), nil
 }
 

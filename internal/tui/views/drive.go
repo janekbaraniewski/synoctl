@@ -51,6 +51,7 @@ func (v *DriveView) Title() string                  { return "Drive" }
 func (v *DriveView) Icon() string                   { return "⌘" }
 func (v *DriveView) RefreshInterval() time.Duration { return 60 * time.Second }
 func (v *DriveView) Bindings() []key.Binding        { return BaseBindings() }
+func (v *DriveView) IsTextEditing() bool            { return v.filter.IsActive() }
 
 func (v *DriveView) Init() tea.Cmd { return tea.Batch(v.fetchStats(), v.fetchFiles()) }
 
@@ -97,7 +98,11 @@ func (v *DriveView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		before := v.filter.Value()
 		if v.filter.Update(msg) {
+			if v.filter.Value() != before {
+				v.cursor = 0
+			}
 			return v, nil
 		}
 	}
@@ -128,6 +133,7 @@ func (v *DriveView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
+			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
 				v.filter.Clear()

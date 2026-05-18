@@ -32,6 +32,7 @@ type sharesMsg struct {
 }
 
 type filesListMsg struct {
+	Path  string
 	E     []dsm.FSEntry
 	Total int
 	Err   error

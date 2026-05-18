@@ -52,6 +52,7 @@ func (a *AdminPage) Bindings() []key.Binding {
 		key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "shutdown (confirm)")),
 	)
 }
+func (a *AdminPage) IsTextEditing() bool { return a.confirm.Open() || a.filter.IsActive() }
 
 func (a *AdminPage) Init() tea.Cmd {
 	return tea.Batch(
@@ -246,7 +247,11 @@ func (a *AdminPage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 	}
 
 	if a.filter.IsActive() {
+		before := a.filter.Value()
 		if a.filter.Update(msg) {
+			if a.filter.Value() != before {
+				a.cursor = 0
+			}
 			return a, nil
 		}
 	}
@@ -284,6 +289,7 @@ func (a *AdminPage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			a.cursor = max(len(a.flatten())-1, 0)
 		case "/":
 			a.filter.Open()
+			a.cursor = 0
 		case "esc":
 			if a.filter.Value() != "" {
 				a.filter.Clear()
