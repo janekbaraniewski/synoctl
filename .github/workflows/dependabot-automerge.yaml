@@ -25,7 +25,7 @@ jobs:
         id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.AUTOMATION_TOKEN || secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
       - name: Log update info
         env:
@@ -35,23 +35,26 @@ jobs:
         run: |
           echo "::notice::ecosystem=$ECOSYSTEM update_type=$UPDATE_TYPE dep_type=$DEP_TYPE"
 
+      # Prefer the automation token so Dependabot auto-merges emit
+      # normal push events and refresh the remaining queued PRs.
+
       - name: Approve the PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.RELEASE_PLEASE_TOKEN || github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           gh pr review --approve "$PR_URL" --body "Auto-approved by policy."
 
       - name: Add auto-approved label
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.RELEASE_PLEASE_TOKEN || github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           gh pr edit "$PR_URL" --add-label auto-approved
 
       - name: Enable auto-merge (squash)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.RELEASE_PLEASE_TOKEN || github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           gh pr merge --auto --squash "$PR_URL"
