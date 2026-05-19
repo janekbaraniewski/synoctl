@@ -140,7 +140,7 @@
         padding: 0 0.45em;
         color: var(--muted);
         background: var(--bg);
-        font-size: 13px;
+        font-size: 14px;
         white-space: nowrap;
       }
 
@@ -156,7 +156,7 @@
         overflow: hidden;
         padding: 0.5em 0.55em 0.3em;
         border-right: 1px solid var(--line);
-        font-size: 13px;
+        font-size: 14px;
         line-height: 1.08;
       }
 
@@ -279,7 +279,7 @@
         min-height: 0;
         overflow: hidden;
         transform-origin: top left;
-        font-size: 24px;
+        font-size: 25px;
         line-height: 1.15;
       }
 
@@ -454,7 +454,7 @@
         padding: 0.25em 0.5em 0.35em;
         color: var(--muted);
         background: var(--bg);
-        font-size: 13px;
+        font-size: 14px;
         white-space: nowrap;
       }
 
@@ -462,7 +462,7 @@
         display: grid;
         grid-template-rows: minmax(0, 1fr) 5.6em;
         background: var(--tour);
-        font-size: 13px;
+        font-size: 14px;
         line-height: 1.08;
       }
 
@@ -485,7 +485,7 @@
         color: var(--muted);
         background: var(--bar2);
         border-top: 1px solid var(--line);
-        font-size: 13px;
+        font-size: 14px;
         white-space: nowrap;
       }
 
@@ -672,6 +672,7 @@
 
       let active = 0;
       let typeTimer = 0;
+      let frameTimer = 0;
 
       function h(value) {
         return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -970,14 +971,18 @@
         el.tour.innerHTML = lines.map(([color, value]) => `<div class="tour-line ${color}">${h(value)}</div>`).join("");
       }
 
-      function playTour(frame) {
+      function playTour(frame, index) {
         clearTimeout(typeTimer);
+        clearTimeout(frameTimer);
         const visible = [];
         let li = 0;
         let ci = 0;
         function step() {
           const line = frame.tour[li];
           if (!line) {
+            frameTimer = setTimeout(() => {
+              if (active === index) setFrame((index + 1) % frames.length);
+            }, 2200);
             return;
           }
           const partial = line[1].slice(0, ci);
@@ -1021,7 +1026,7 @@
           el.shell.appendChild(panel);
         }
         renderTabs();
-        playTour(frame);
+        playTour(frame, index);
       }
 
       function scaleDashboard() {
@@ -1035,7 +1040,7 @@
         const scale = Math.min(
           pane.clientWidth / dashboard.offsetWidth,
           pane.clientHeight / dashboard.offsetHeight
-        ) * 0.95;
+        ) * 0.93;
         dashboard.style.transform = `scale(${Math.max(0.1, scale)})`;
       }
 
