@@ -10,16 +10,12 @@ on:
     secrets:
       AUTOMATION_TOKEN:
         description: |
-          Optional PAT or GitHub App token used to update Dependabot PR
-          branches. Falls back to RELEASE_PLEASE_TOKEN and then the
-          default GITHUB_TOKEN. The default token *can* call
-          updateBranch when `permissions.pull-requests: write` is granted,
-          so this workflow runs cleanly even without any PAT — its
-          openusage origin required a PAT for unrelated reasons we
-          don't share here.
+          Deprecated. This workflow intentionally uses GITHUB_TOKEN for
+          branch updates because PATs without workflow scope cannot update
+          Dependabot branches that touch workflow files.
         required: false
       RELEASE_PLEASE_TOKEN:
-        description: Fallback PAT if AUTOMATION_TOKEN is unset.
+        description: Deprecated; kept for caller compatibility.
         required: false
 
 permissions:
@@ -35,14 +31,11 @@ jobs:
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          github-token: ${{ secrets.AUTOMATION_TOKEN || secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const { owner, repo } = context.repo;
-            // No hard token check — the action input above falls back to
-            // the default GITHUB_TOKEN, which is enough to call
-            // pulls.updateBranch when pull-requests:write is granted. PATs
-            // give more headroom for cross-fork PRs etc., but the basic
-            // refresh path works without one.
+            // GITHUB_TOKEN can call pulls.updateBranch with
+            // pull-requests:write and can update workflow-file bumps.
 
             const isAlreadyCurrent = (error) =>
               error.status === 422 &&
@@ -140,4 +133,4 @@ jobs:
               }
             }
         env:
-          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
