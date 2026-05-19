@@ -1,0 +1,25 @@
+name: Conventional PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    name: Conventional PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate pull request title
+        run: |
+          title=$(jq -r '.pull_request.title // ""' "$GITHUB_EVENT_PATH")
+          pattern='^(build|chore|ci|deps|docs|feat|fix|perf|refactor|revert|style|test)(\([A-Za-z0-9_.-]+\))?!?: .+'
+
+          if [[ ! "$title" =~ $pattern ]]; then
+            echo "::error title=Invalid pull request title::Use Conventional Commits, for example: fix(tui): keep sidebar scrolled"
+            echo "Current title: $title"
+            exit 1
+          fi
