@@ -31,7 +31,8 @@ jobs:
     name: Refresh matching PR branches
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      issues: read
       pull-requests: write
     steps:
       - id: refresh

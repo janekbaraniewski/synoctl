@@ -26,13 +26,22 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      pull-requests: read
     steps:
+      - name: Require release automation token
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.AUTOMATION_TOKEN }}
+        run: |
+          test -n "$RELEASE_TOKEN" || {
+            echo "::error::Configure RELEASE_PLEASE_TOKEN or AUTOMATION_TOKEN; GITHUB_TOKEN is intentionally read-only."
+            exit 1
+          }
+
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.AUTOMATION_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
@@ -41,7 +50,8 @@ jobs:
     name: Update open release PR branches
     uses: ./.github/workflows/refresh-pr-branches.yaml
     permissions:
-      contents: write
+      contents: read
+      issues: read
       pull-requests: write
     with:
       labels: "autorelease: pending"

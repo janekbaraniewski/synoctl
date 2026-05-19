@@ -149,3 +149,23 @@ func cloneValues(v url.Values) url.Values {
 	}
 	return out
 }
+
+func FuzzFlexBoolUnmarshal(f *testing.F) {
+	for _, seed := range []string{
+		"true",
+		"false",
+		"1",
+		"0",
+		`"yes"`,
+		`"no"`,
+		`""`,
+		"null",
+		"{",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, input string) {
+		var b flexBool
+		_ = json.Unmarshal([]byte(input), &b)
+	})
+}

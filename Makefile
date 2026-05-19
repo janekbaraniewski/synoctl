@@ -16,9 +16,7 @@ LDFLAGS        := -s -w \
 GOFILES        := $(shell find . -name '*.go' -not -path './vendor/*' -not -path './bin/*' -not -path './dist/*')
 
 GORELEASER     ?= goreleaser
-# Pinned to the last release that still works with Go 1.24 — v1.7.12+
-# requires Go 1.25 which CI doesn't have yet.
-ACTIONLINT     ?= $(GO) run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+ACTIONLINT     ?= $(GO) run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
 .PHONY: help build build-all run install tidy fmt fmt-check vet lint test discover login \
         workflow-lint release-check release-snapshot clean ci all
@@ -82,7 +80,7 @@ vet: ## go vet ./...
 lint: fmt-check vet ## Run all linters
 
 workflow-lint: ## Lint .github/workflows with actionlint
-	@$(ACTIONLINT) .github/workflows/*.yml
+	@$(ACTIONLINT) .github/workflows/*.yml .github/workflows/*.yaml
 
 test: ## Run unit tests
 	@$(GO) test ./... -race -count=1

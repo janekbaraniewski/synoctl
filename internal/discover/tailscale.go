@@ -2,7 +2,6 @@ package discover
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -139,8 +138,9 @@ func probePeer(ctx context.Context, p tailscalePeer) (Device, bool) {
 	if ip == "" {
 		return Device{}, false
 	}
-	// Try https first (most DSM 7 boxes auto-redirect; SelfSigned is
-	// the norm so we skip verification).
+	// Try verified HTTPS first, then DSM's default HTTP port. We do not
+	// disable certificate verification during discovery; users can still
+	// opt into insecure TLS for the actual configured DSM profile.
 	candidates := []struct {
 		scheme string
 		port   int
@@ -169,12 +169,13 @@ func probePeer(ctx context.Context, p tailscalePeer) (Device, bool) {
 }
 
 // dsmProbeClient is a small short-timeout client used only for tailnet
-// probing. We deliberately accept self-signed certs.
+// probing. HTTPS probes use the platform trust store; self-signed DSM
+// certificates fail closed here and the HTTP fallback can still discover
+// default DSM installs.
 var dsmProbeClient = &http.Client{
 	Timeout: 3 * time.Second,
 	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // probe-only
-		Proxy:           http.ProxyFromEnvironment,
+		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout: 2 * time.Second,
 		}).DialContext,

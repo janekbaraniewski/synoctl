@@ -10,14 +10,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# The reusable callee needs contents:write + pull-requests:write to
-# nudge Dependabot's branches. A reusable workflow can never escalate
-# beyond what its caller grants -- so the caller has to grant them too,
-# otherwise GitHub rejects the run with "startup_failure" before the
-# job ever spins up.
+# The reusable callee only needs pull-requests:write to request branch
+# updates. Keep contents read-only so the default GITHUB_TOKEN cannot
+# push repository contents from this workflow.
 permissions:
-  contents: write
-  issues: write
+  contents: read
   pull-requests: write
 
 jobs:
@@ -26,5 +23,5 @@ jobs:
     uses: ./.github/workflows/refresh-dependabot-prs.yaml
     secrets: inherit
     permissions:
-      contents: write
+      contents: read
       pull-requests: write

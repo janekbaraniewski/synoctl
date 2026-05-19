@@ -13,7 +13,7 @@ on:
           Optional PAT or GitHub App token used to update Dependabot PR
           branches. Falls back to RELEASE_PLEASE_TOKEN and then the
           default GITHUB_TOKEN. The default token *can* call
-          updateBranch when `permissions.contents: write` is granted,
+          updateBranch when `permissions.pull-requests: write` is granted,
           so this workflow runs cleanly even without any PAT — its
           openusage origin required a PAT for unrelated reasons we
           don't share here.
@@ -30,7 +30,7 @@ jobs:
     name: Refresh open Dependabot PRs
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -40,7 +40,7 @@ jobs:
             const { owner, repo } = context.repo;
             // No hard token check — the action input above falls back to
             // the default GITHUB_TOKEN, which is enough to call
-            // pulls.updateBranch when contents:write is granted. PATs
+            // pulls.updateBranch when pull-requests:write is granted. PATs
             // give more headroom for cross-fork PRs etc., but the basic
             // refresh path works without one.
 
