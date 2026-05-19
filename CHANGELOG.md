@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.7](https://github.com/janekbaraniewski/synoctl/compare/v0.2.6...v0.2.7) (2026-05-19)
+
+
+### Bug Fixes
+
+* **release:** include docs changes in release-please ([3c8c255](https://github.com/janekbaraniewski/synoctl/commit/3c8c2557601aaf6a76d0a394fe4ec81ee4a9f137))
+
+
+### Documentation
+
+* add transparent synoctl logo ([19d7c5e](https://github.com/janekbaraniewski/synoctl/commit/19d7c5ec728940c132104817617c480992055e2b))
+
 ## [0.2.6](https://github.com/janekbaraniewski/synoctl/compare/v0.2.5...v0.2.6) (2026-05-19)
 
 
