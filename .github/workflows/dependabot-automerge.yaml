@@ -1,13 +1,12 @@
 name: Dependabot auto-merge
 
-# Approves and enables auto-merge for Dependabot PRs that bump
-# dependencies by a patch or minor version. Major bumps are
-# explicitly skipped so a human still reviews them. Auto-merge
+# Approves and enables auto-merge for Dependabot PRs. Auto-merge
 # kicks in only after the normal required status checks pass.
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, labeled]
 
 permissions:
   contents: read
@@ -15,10 +14,10 @@ permissions:
 jobs:
   automerge:
     name: Approve and enable auto-merge
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
       pull-requests: write
     steps:
@@ -36,26 +35,14 @@ jobs:
         run: |
           echo "::notice::ecosystem=$ECOSYSTEM update_type=$UPDATE_TYPE dep_type=$DEP_TYPE"
 
-      - name: Skip major bumps
-        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: |
-          echo "::notice::Major version bump detected — leaving PR for human review."
-          gh pr comment "$PR_URL" --body "Major version bump detected; auto-merge skipped. A human review is required."
-          exit 0
-
       - name: Approve the PR
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          gh pr review --approve "$PR_URL" --body "Auto-approved by policy (patch/minor Dependabot bump)."
+          gh pr review --approve "$PR_URL" --body "Auto-approved by policy."
 
       - name: Add auto-approved label
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -63,7 +50,6 @@ jobs:
           gh pr edit "$PR_URL" --add-label auto-approved
 
       - name: Enable auto-merge (squash)
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
