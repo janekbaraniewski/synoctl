@@ -46,7 +46,7 @@
       body {
         color: var(--text);
         font-family: var(--font);
-        font-size: clamp(11px, min(0.66vw, 1.18vh), 15px);
+        font-size: 14px;
         font-weight: 700;
         line-height: 1.18;
         letter-spacing: 0;
@@ -68,11 +68,19 @@
       }
 
       .tmux {
-        display: grid;
-        grid-template-rows: 1.55em 1.55em minmax(0, 1fr) 1.55em;
-        width: 100vw;
+        display: block;
+        position: relative;
+        width: 100%;
         height: 100vh;
+        overflow: hidden;
         background: var(--bg);
+      }
+
+      .session,
+      .pane-tabs,
+      .tour-pane,
+      .tmux-status {
+        display: none !important;
       }
 
       .session,
@@ -96,8 +104,8 @@
 
       .pane-tabs,
       .panes {
-        display: grid;
-        grid-template-columns: minmax(64em, 68fr) minmax(31em, 32fr);
+        display: block;
+        width: 100%;
       }
 
       .pane-tab {
@@ -114,7 +122,11 @@
       }
 
       .panes {
+        position: relative;
+        width: 100%;
+        height: 100%;
         min-height: 0;
+        overflow: hidden;
       }
 
       .left-pane,
@@ -126,16 +138,24 @@
 
       .left-pane {
         display: grid;
-        grid-template-rows: 1.65em minmax(0, 1fr) 3.15em;
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        grid-template-rows: 1.57em minmax(0, 1fr) 3.42em;
+        font-size: clamp(12px, min(1.244vw, 1.103vh), 28px);
+        line-height: 1.08;
+        transform: none;
         background: var(--pane);
-        border-right: 1px solid var(--line-hi);
+        border-right: 0;
       }
 
       .syno-top {
         display: grid;
-        grid-template-columns: 20em minmax(0, 1fr) 18em;
+        grid-template-columns: 18.6em minmax(0, 1fr) 17.2em;
         align-items: center;
-        padding: 0 0.45em;
+        padding: 0 0.64em;
         color: var(--muted);
         background: var(--bg);
         white-space: nowrap;
@@ -143,7 +163,7 @@
 
       .syno-body {
         display: grid;
-        grid-template-columns: 15.5em minmax(0, 1fr);
+        grid-template-columns: 13.05em minmax(0, 1fr);
         min-height: 0;
         overflow: hidden;
       }
@@ -151,16 +171,16 @@
       .sidebar {
         min-width: 0;
         overflow: hidden;
-        padding: 0.5em 0.55em 0.3em;
+        padding: 0.64em 0.72em 0.42em;
         border-right: 1px solid var(--line);
       }
 
       .section {
-        margin: 0 0 1.0em;
+        margin: 0 0 1.11em;
       }
 
       .section-title {
-        margin-bottom: 0.18em;
+        margin-bottom: 0.14em;
         color: var(--amber);
         font-weight: 900;
         text-transform: uppercase;
@@ -169,13 +189,13 @@
       .nav-row {
         display: flex;
         align-items: center;
-        height: 1.18em;
+        height: 1.11em;
         color: var(--text);
         white-space: nowrap;
       }
 
       .marker {
-        width: 1.05em;
+        width: 1.07em;
         color: transparent;
       }
 
@@ -185,10 +205,11 @@
 
       .nav-row.active .marker {
         color: var(--amber);
+        transform: translateX(-0.58em);
       }
 
       .icon {
-        width: 1.45em;
+        width: 1.72em;
         color: var(--text);
       }
 
@@ -213,12 +234,12 @@
         min-width: 0;
         min-height: 0;
         overflow: hidden;
-        padding: 0.5em 0.8em 0.4em;
+        padding: 0.57em 0.64em 0.42em;
       }
 
       .view-main.dashboard-main {
         position: relative;
-        padding: 0.55em 0.85em 0.6em;
+        padding: 0.43em 0.57em 0.45em;
       }
 
       .inspector {
@@ -250,7 +271,7 @@
         display: flex;
         align-items: center;
         min-width: 0;
-        margin-bottom: 0.55em;
+        margin-bottom: 0.35em;
         color: var(--amber);
         white-space: nowrap;
       }
@@ -264,17 +285,13 @@
       }
 
       .dashboard-view {
-        display: grid;
-        grid-template-rows: 2.1em 5.8em 4.6em 4.6em minmax(0, 1fr);
-        gap: 1.0em;
-        width: 1885px;
-        height: 1888px;
+        display: block;
+        position: relative;
+        width: 100%;
+        height: 100%;
         min-width: 0;
         min-height: 0;
         overflow: hidden;
-        transform-origin: top left;
-        font-size: 28px;
-        line-height: 1.15;
       }
 
       .dashboard-view .path,
@@ -285,15 +302,20 @@
 
       .cards {
         display: grid;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5.72em;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 1.15em;
+        gap: 1.14em;
         min-height: 0;
       }
 
       .metric {
         min-width: 0;
         min-height: 0;
-        padding: 0.62em 0.82em 0.65em;
+        padding: 0.75em 0.86em 0.68em;
         border: 1px solid var(--line);
         border-radius: 0.22em;
         background: #111820;
@@ -346,11 +368,29 @@
 
       .panel {
         min-width: 0;
-        padding: 0.75em 0.9em;
+        padding: 0.5em 0.86em;
         border: 1px solid var(--line);
         border-radius: 0.22em;
         background: #111820;
         overflow: hidden;
+      }
+
+      .volumes-panel,
+      .disks-panel,
+      .dash-bottom {
+        position: absolute;
+        left: 0;
+        right: 0;
+      }
+
+      .volumes-panel {
+        top: 8em;
+        height: 4.6em;
+      }
+
+      .disks-panel {
+        top: 13.72em;
+        height: 4.6em;
       }
 
       .volume-row,
@@ -363,7 +403,7 @@
         display: grid;
         align-items: center;
         min-width: 0;
-        min-height: 1.22em;
+        min-height: 1.08em;
         white-space: nowrap;
       }
 
@@ -385,8 +425,10 @@
 
       .dash-bottom {
         display: grid;
+        top: 19.43em;
+        bottom: 0;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 1.05em;
+        gap: 1.14em;
         min-height: 0;
         overflow: hidden;
       }
@@ -396,8 +438,8 @@
       }
 
       .process-row {
-        grid-template-columns: 5em minmax(0, 1fr) 13em 6em;
-        column-gap: 0.8em;
+        grid-template-columns: 4.7em 10.2em minmax(0, 1fr) 5.5em;
+        column-gap: 0.55em;
       }
 
       .activity-row {
@@ -445,7 +487,7 @@
         align-content: end;
         min-width: 0;
         overflow: hidden;
-        padding: 0.25em 0.5em 0.35em;
+        padding: 0.36em 0.64em 0.42em;
         color: var(--muted);
         background: var(--bg);
         white-space: nowrap;
@@ -509,16 +551,6 @@
         white-space: nowrap;
       }
 
-      @media (max-width: 1180px) {
-        body {
-          overflow: auto;
-        }
-
-        .tmux {
-          min-width: 1180px;
-          min-height: 760px;
-        }
-      }
     </style>
   </head>
   <body>
@@ -538,7 +570,7 @@
           <div class="syno-top">
             <div><span class="amber">◣</span> <span class="bold">synoctl</span> <span class="green"> • </span> 127.0.0.1:60989</div>
             <div class="muted" style="text-align:center">DSM 7.2.2-72806 Update 3</div>
-            <div class="muted" style="text-align:right">up 169d 00h&nbsp;&nbsp;01:03</div>
+            <div class="muted" style="text-align:right">up 169d 00h&nbsp;&nbsp;01:02</div>
           </div>
 
           <div class="syno-body">
@@ -578,12 +610,12 @@
     <script>
       const sections = [
         ["Overview", [["◆", "Dashboard"], ["▤", "Resource Monitor"]]],
-        ["Storage", [["▮", "Storage Health"], ["▦", "Shares & Files"], ["⇆", "iSCSI"]]],
+        ["Storage", [["▮", "Volumes"], ["●", "Disks"], ["▦", "Shares & Files"], ["⊞", "Quotas"], ["⇆", "iSCSI"]]],
         ["Apps", [["▣", "Apps"], ["▦", "Containers"], ["▩", "Virtual Machines"]]],
         ["Backup", [["▰", "Hyper Backup"], ["⬇", "Active Backup"], ["☁", "Cloud Sync"]]],
         ["Services", [["⌘", "Drive"], ["◎", "Cameras"]]],
         ["Security", [["⛨", "Certificates"], ["⚐", "Security"], ["▤", "Firewall"]]],
-        ["System", [["⌂", "Admin"], ["⊞", "Quotas"], ["◷", "Scheduled Tasks"], ["⌬", "DDNS"], ["✉", "Notifications"]]],
+        ["System", [["⌂", "Admin"], ["◷", "Scheduled Tasks"], ["⌬", "DDNS"], ["✉", "Notifications"]]],
         ["Settings", [["↟", "DSM Update"], ["◉", "Time & Region"], ["⏻", "Power & Schedule"], ["⇄", "External Access"]]],
         ["Tools", [["⚙", "API Explorer"]]]
       ];
@@ -701,22 +733,20 @@
       function renderDashboard() {
         return `
           <div class="dashboard-view">
-            <div class="path"><span>${cls("amber", "overview /")} ${cls("muted", "(dashboard)")}</span><span class="path-line"></span></div>
-
             <div class="cards">
               ${metric("CPU", "26%", 26, "green", cls("blue spark", "▆▆▇▇▆▅▅"))}
-              ${metric("Memory", "60%", 60, "yellow", cls("blue spark", "▆▆▅▅▅▅"))}
+              ${metric("Memory", "60%", 60, "yellow", cls("blue spark", "▆▆▅▅▅▅") + cls("muted", "5.2 GiB · 8.0 GiB"))}
               ${metric("Network", "↓ 7.7 MiB/s", 58, "blue", cls("blue spark", "▃▄▅▆▇▆") + cls("blue", "↑ 739 KiB/s"))}
               ${metric("Disk I/O", "37%", 37, "green", cls("blue spark", "▆▆▅▄▃"))}
             </div>
 
-            <div class="panel">
+            <div class="panel volumes-panel">
               <div class="subhead">Volumes</div>
               ${volume("/volume1", 57, "9.1 TiB / 16 TiB", "normal")}
               ${volume("/volume2", 7.5, "305 GiB / 4.0 TiB", "normal")}
             </div>
 
-            <div class="panel">
+            <div class="panel disks-panel">
               <div class="subhead">Disks</div>
               <div class="disk-grid">
                 ${disk("sda", "WDC WD80EFAX-68LHPN0", "39°C", "normal", "green")}
@@ -752,6 +782,26 @@
                 ${process("5455", "containerd-shim-r...", 3, "18 MiB", "green")}
                 ${process("712", "synobasic", 3, "24 MiB", "green")}
                 ${process("729", "synowebapi", 3, "28 MiB", "green")}
+                ${process("5466", "containerd-shim-r...", 3, "22 MiB", "green")}
+                ${process("5444", "containerd-shim-r...", 3, "12 MiB", "green")}
+                ${process("711", "synoschedd", 2, "19 MiB", "green")}
+                ${process("6102", "synohyperbackup", 2, "47 MiB", "green")}
+                ${process("719", "synologmgr", 2, "18 MiB", "green")}
+                ${process("2420", "synofotoencoder", 2, "38 MiB", "green")}
+                ${process("622", "synologin", 2, "22 MiB", "green")}
+                ${process("11234", "active-backup-bus", 2, "66 MiB", "green")}
+                ${process("716", "synocgrpd", 2, "11 MiB", "green")}
+                ${process("2430", "synocloudsyncd", 2, "42 MiB", "green")}
+                ${process("725", "synosharing", 1, "12 MiB", "green")}
+                ${process("726", "synosnmpcd", 1, "9.2 MiB", "green")}
+                ${process("727", "synosurffshare", 1, "14 MiB", "green")}
+                ${process("728", "synotifvd", 1, "11 MiB", "green")}
+                ${process("723", "synopkgctl", 1, "12 MiB", "green")}
+                ${process("730", "synowebcgid", 1, "14 MiB", "green")}
+                ${process("983", "nmbd", 1, "18 MiB", "green")}
+                ${process("984", "winbindd", 1, "22 MiB", "green")}
+                ${process("1101", "nfsd", 1, "0 B", "green")}
+                ${process("1102", "rpc.mountd", 1, "4.1 MiB", "green")}
               </div>
               <div class="panel">
                 <div class="subhead">Recent activity</div>
@@ -771,6 +821,16 @@
                 ${activity("•", "2026-05-18 12:02…", "\"Monthly cold storage -> external\" started", "blue")}
                 ${activity("✗", "2026-05-18 11:02…", "5 failed login attempts -> IP auto-blocked", "red")}
                 ${activity("•", "2026-05-18 07:02…", "Time synchronised with pool.ntp.org", "blue")}
+                ${activity("•", "2026-05-18 03:02…", "laptop-jan ran scheduled backup", "blue")}
+                ${activity("⚠", "2026-05-17 23:02…", "Volume 1 used 91% - consider cleanup", "yellow")}
+                ${activity("•", "2026-05-17 19:02…", "Recycle bin auto-purge removed 38 GiB", "blue")}
+                ${activity("•", "2026-05-17 18:02…", "Package database refreshed", "blue")}
+                ${activity("•", "2026-05-17 16:02…", "Cloud Sync completed remote diff", "blue")}
+                ${activity("•", "2026-05-17 14:02…", "SMB session closed", "blue")}
+                ${activity("•", "2026-05-17 12:02…", "Drive indexer finished", "blue")}
+                ${activity("⚠", "2026-05-17 09:02…", "External disk disconnected", "yellow")}
+                ${activity("•", "2026-05-17 07:02…", "Hyper Backup integrity check passed", "blue")}
+                ${activity("•", "2026-05-17 03:02…", "System booted normally", "blue")}
               </div>
             </div>
           </div>
@@ -982,7 +1042,7 @@
         el.shell.className = `view-shell${frame.inspector ? " with-inspector" : ""}`;
         el.main.className = `view-main${frame.id === "dashboard" ? " dashboard-main" : ""}`;
         el.main.innerHTML = frame.render();
-        scaleDashboard();
+        scaleApp();
         [...el.shell.querySelectorAll(".inspector")].forEach((node) => node.remove());
         if (frame.inspector) {
           const panel = document.createElement("aside");
@@ -995,19 +1055,21 @@
       }
 
       function scaleDashboard() {
-        const dashboard = el.main.querySelector(".dashboard-view");
-        if (!dashboard) return;
-        const scale = Math.min(
-          el.main.clientWidth / dashboard.offsetWidth,
-          el.main.clientHeight / dashboard.offsetHeight
-        );
-        dashboard.style.transform = `scale(${Math.max(0.1, scale)})`;
+        scaleApp();
+      }
+
+      function scaleApp() {
+        const pane = document.querySelector(".left-pane");
+        if (!pane) return;
+        pane.style.transform = "none";
+        pane.style.left = "0";
+        pane.style.top = "0";
       }
 
       window.addEventListener("keydown", (event) => {
         if (event.key >= "1" && event.key <= "4") setFrame(Number(event.key) - 1);
       });
-      window.addEventListener("resize", scaleDashboard);
+      window.addEventListener("resize", scaleApp);
 
       setFrame(0);
     </script>
