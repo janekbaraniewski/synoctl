@@ -53,15 +53,19 @@ jobs:
                 return;
               }
 
-              await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-                owner,
-                repo,
-                issue_number: pullNumber,
-                body: '@dependabot recreate',
+              const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${pullNumber}/comments`, {
+                method: 'POST',
                 headers: {
                   authorization: `Bearer ${token}`,
+                  accept: 'application/vnd.github+json',
+                  'content-type': 'application/json',
+                  'x-github-api-version': '2022-11-28',
                 },
+                body: JSON.stringify({ body: '@dependabot recreate' }),
               });
+              if (!response.ok) {
+                throw new Error(`Dependabot recreate comment failed with HTTP ${response.status}: ${await response.text()}`);
+              }
               core.notice(`Requested Dependabot recreate for PR #${pullNumber} after updateBranch failed: ${reason}`);
             }
 
