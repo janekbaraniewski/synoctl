@@ -15,7 +15,7 @@
         {"type": "perf", "section": "Performance"},
         {"type": "deps", "section": "Dependencies"},
         {"type": "refactor", "section": "Refactoring"},
-        {"type": "docs", "section": "Documentation", "hidden": true},
+        {"type": "docs", "section": "Documentation"},
         {"type": "chore", "section": "Miscellaneous", "hidden": true},
         {"type": "ci", "section": "CI/CD", "hidden": true},
         {"type": "test", "section": "Tests", "hidden": true},
