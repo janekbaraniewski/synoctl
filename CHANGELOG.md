@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.8](https://github.com/janekbaraniewski/synoctl/compare/v0.2.7...v0.2.8) (2026-05-20)
+
+
+### Documentation
+
+* expand landing page screens ([#43](https://github.com/janekbaraniewski/synoctl/issues/43)) ([6e006f8](https://github.com/janekbaraniewski/synoctl/commit/6e006f8f18aebad26dde0e43f89906d470615a15))
+
 ## [0.2.7](https://github.com/janekbaraniewski/synoctl/compare/v0.2.6...v0.2.7) (2026-05-19)
 
 
