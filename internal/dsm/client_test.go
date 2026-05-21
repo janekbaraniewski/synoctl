@@ -25,6 +25,19 @@ func TestClient_Options(t *testing.T) {
 	}
 }
 
+func TestClient_HostDisplayOverride(t *testing.T) {
+	c, err := New(Options{Host: "127.0.0.1", Port: 49152, DisplayHost: "demo-nas.local:5000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Host(); got != "demo-nas.local:5000" {
+		t.Fatalf("Host() = %q, want demo-nas.local:5000", got)
+	}
+	if got := c.baseURL.Host; got != "127.0.0.1:49152" {
+		t.Fatalf("baseURL.Host = %q, want 127.0.0.1:49152", got)
+	}
+}
+
 func TestClient_Authenticated(t *testing.T) {
 	c, _ := New(Options{Host: "nas"})
 	if c.Authenticated() {

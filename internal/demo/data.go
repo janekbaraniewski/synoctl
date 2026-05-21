@@ -1,7 +1,7 @@
 package demo
 
 // Canned demo data. Everything here is hand-tuned to look like a
-// real, lived-in homelab NAS:
+// real, lived-in lab NAS:
 //   - 5+ month uptime, mixed-state packages, a couple of issues to
 //     show off the alert colouring
 //   - File trees deep enough to demo drill-down + dir-sizing
@@ -225,7 +225,7 @@ var demoStorage = map[string]any{
 // — shares —
 
 var demoShares = []map[string]any{
-	{"name": "photo", "vol_path": "/volume1", "desc": "Family photos + auto-backup target", "encryption": 1, "enc_status": 1, "hidden": false, "enable_recycle_bin": true, "is_readonly": false, "is_usb_share": false, "is_sync_share": false, "is_cloudsync_share": false, "share_quota": 2_000_000, "share_quota_used": 1_265_404},
+	{"name": "photo", "vol_path": "/volume1", "desc": "Event photos + auto-backup target", "encryption": 1, "enc_status": 1, "hidden": false, "enable_recycle_bin": true, "is_readonly": false, "is_usb_share": false, "is_sync_share": false, "is_cloudsync_share": false, "share_quota": 2_000_000, "share_quota_used": 1_265_404},
 	{"name": "video", "vol_path": "/volume1", "desc": "Movies + TV", "hidden": false, "enable_recycle_bin": true, "share_quota": 0, "share_quota_used": 0},
 	{"name": "music", "vol_path": "/volume1", "desc": "FLAC + MP3 library", "hidden": false, "enable_recycle_bin": false},
 	{"name": "books", "vol_path": "/volume1", "desc": "ePub / PDF / audiobooks", "hidden": false, "enable_recycle_bin": false},
@@ -241,25 +241,25 @@ var demoShares = []map[string]any{
 
 var demoFileShares = []map[string]any{
 	{"isdir": true, "name": "photo", "path": "/photo",
-		"additional": map[string]any{"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"additional": map[string]any{"owner": map[string]any{"user": "operator", "group": "users"},
 			"volume_status": map[string]any{"freespace": 7_560_299_298_816, "totalspace": 17_592_186_044_416, "readonly": false}}},
 	{"isdir": true, "name": "video", "path": "/video",
-		"additional": map[string]any{"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"additional": map[string]any{"owner": map[string]any{"user": "operator", "group": "users"},
 			"volume_status": map[string]any{"freespace": 7_560_299_298_816, "totalspace": 17_592_186_044_416, "readonly": false}}},
 	{"isdir": true, "name": "music", "path": "/music",
-		"additional": map[string]any{"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"additional": map[string]any{"owner": map[string]any{"user": "operator", "group": "users"},
 			"volume_status": map[string]any{"freespace": 7_560_299_298_816, "totalspace": 17_592_186_044_416, "readonly": false}}},
 	{"isdir": true, "name": "books", "path": "/books",
-		"additional": map[string]any{"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"additional": map[string]any{"owner": map[string]any{"user": "operator", "group": "users"},
 			"volume_status": map[string]any{"freespace": 7_560_299_298_816, "totalspace": 17_592_186_044_416, "readonly": false}}},
 	{"isdir": true, "name": "homes", "path": "/homes",
 		"additional": map[string]any{"owner": map[string]any{"user": "root", "group": "root"},
 			"volume_status": map[string]any{"freespace": 7_560_299_298_816, "totalspace": 17_592_186_044_416, "readonly": false}}},
 	{"isdir": true, "name": "backups", "path": "/backups",
-		"additional": map[string]any{"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"additional": map[string]any{"owner": map[string]any{"user": "operator", "group": "users"},
 			"volume_status": map[string]any{"freespace": 4_070_366_511_104, "totalspace": 4_398_046_511_104, "readonly": false}}},
 	{"isdir": true, "name": "code", "path": "/code",
-		"additional": map[string]any{"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"additional": map[string]any{"owner": map[string]any{"user": "operator", "group": "users"},
 			"volume_status": map[string]any{"freespace": 7_560_299_298_816, "totalspace": 17_592_186_044_416, "readonly": false}}},
 }
 
@@ -267,14 +267,14 @@ var demoFileShares = []map[string]any{
 
 func fsdir(name, path string) map[string]any {
 	return map[string]any{"isdir": true, "name": name, "path": path, "additional": map[string]any{
-		"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"owner": map[string]any{"user": "operator", "group": "users"},
 		"time":  map[string]any{"mtime": time.Now().Add(-72 * time.Hour).Unix()},
 		"perm":  map[string]any{"posix": 755},
 	}}
 }
 func fsfile(name, path string, size int64, modAgo time.Duration) map[string]any {
 	return map[string]any{"isdir": false, "name": name, "path": path, "additional": map[string]any{
-		"owner": map[string]any{"user": "baraniewski", "group": "users"},
+		"owner": map[string]any{"user": "operator", "group": "users"},
 		"size":  size,
 		"time":  map[string]any{"mtime": time.Now().Add(-modAgo).Unix()},
 		"perm":  map[string]any{"posix": 644},
@@ -286,15 +286,15 @@ var demoFolderContents = map[string][]map[string]any{
 		fsdir("2026", "/photo/2026"),
 		fsdir("2025", "/photo/2025"),
 		fsdir("2024", "/photo/2024"),
-		fsdir("Family", "/photo/Family"),
+		fsdir("Events", "/photo/Events"),
 		fsdir("Travel", "/photo/Travel"),
-		fsdir("Wedding", "/photo/Wedding"),
+		fsdir("Archive", "/photo/Archive"),
 		fsfile("front.jpg", "/photo/front.jpg", 1_034_240, 8*time.Hour),
 		fsfile("DSC02184.RAF", "/photo/DSC02184.RAF", 38_421_400, 28*time.Hour),
 		fsfile("DSC02185.RAF", "/photo/DSC02185.RAF", 41_388_812, 28*time.Hour),
 	},
 	"/photo/2026": {
-		fsdir("01-jan", "/photo/2026/01-jan"),
+		fsdir("01-winter", "/photo/2026/01-winter"),
 		fsdir("02-feb", "/photo/2026/02-feb"),
 		fsdir("03-mar", "/photo/2026/03-mar"),
 		fsdir("04-apr", "/photo/2026/04-apr"),
@@ -319,7 +319,7 @@ var demoFolderContents = map[string][]map[string]any{
 		fsfile("the-pragmatic-programmer.epub", "/books/the-pragmatic-programmer.epub", 2_140_220, 80*24*time.Hour),
 	},
 	"/homes": {
-		fsdir("baraniewski", "/homes/baraniewski"),
+		fsdir("operator", "/homes/operator"),
 		fsdir("demo", "/homes/demo"),
 	},
 	"/backups": {
@@ -330,7 +330,7 @@ var demoFolderContents = map[string][]map[string]any{
 	"/code": {
 		fsdir("synology-ctl", "/code/synology-ctl"),
 		fsdir("openusage", "/code/openusage"),
-		fsdir("homelab-iac", "/code/homelab-iac"),
+		fsdir("lab-iac", "/code/lab-iac"),
 		fsfile(".gitconfig", "/code/.gitconfig", 1248, 200*24*time.Hour),
 	},
 	"__default__": {
@@ -372,17 +372,17 @@ func demoDirSize(path string) (int64, int64, int64) {
 // — users / groups —
 
 var demoUsers = []map[string]any{
-	{"name": "baraniewski", "uid": 1026, "description": "Jan (admin)", "email": "jan@example.com", "expired": "normal", "groups": []string{"administrators", "users"}, "password_never_expire": true},
-	{"name": "demo", "uid": 1027, "description": "Demo viewer", "email": "demo@example.com", "expired": "normal", "groups": []string{"users"}},
+	{"name": "operator", "uid": 1026, "description": "Demo Admin", "email": "operator@example.test", "expired": "normal", "groups": []string{"administrators", "users"}, "password_never_expire": true},
+	{"name": "demo", "uid": 1027, "description": "Demo viewer", "email": "demo@example.test", "expired": "normal", "groups": []string{"users"}},
 	{"name": "backup-svc", "uid": 1028, "description": "Service account for Hyper Backup", "email": "", "expired": "normal", "groups": []string{"backup-operators"}, "password_never_expire": true},
 	{"name": "guest", "uid": 1029, "description": "Disabled guest account", "email": "", "expired": "now", "groups": []string{"users"}},
-	{"name": "kid", "uid": 1030, "description": "Family — restricted access", "email": "", "expired": "normal", "groups": []string{"users", "kids"}},
+	{"name": "limited", "uid": 1030, "description": "Limited demo user", "email": "", "expired": "normal", "groups": []string{"users", "restricted"}},
 }
 
 var demoGroups = []map[string]any{
 	{"name": "administrators", "gid": 101, "description": "DSM admins"},
 	{"name": "users", "gid": 100, "description": "Standard users"},
-	{"name": "kids", "gid": 1050, "description": "Restricted profile"},
+	{"name": "restricted", "gid": 1050, "description": "Restricted profile"},
 	{"name": "backup-operators", "gid": 1100, "description": "Allowed to write to /backups"},
 	{"name": "developers", "gid": 1200, "description": "Synology Drive shared workspace"},
 }
@@ -390,10 +390,10 @@ var demoGroups = []map[string]any{
 // — network —
 
 var demoNetworkInterfaces = []map[string]any{
-	{"id": "eth0", "ifname": "LAN 1", "type": "lan", "ip": "192.168.1.36", "mask": "255.255.255.0", "gateway": "192.168.1.1", "mac": "00:11:32:DE:M0:01", "mtu": 1500, "speed": 2500, "status": "connected", "use_dhcp": true},
+	{"id": "eth0", "ifname": "LAN 1", "type": "lan", "ip": "10.24.8.36", "mask": "255.255.255.0", "gateway": "10.24.8.1", "mac": "00:11:32:DE:M0:01", "mtu": 1500, "speed": 2500, "status": "connected", "use_dhcp": true},
 	{"id": "eth1", "ifname": "LAN 2", "type": "lan", "ip": "10.0.0.36", "mask": "255.255.255.0", "gateway": "10.0.0.1", "mac": "00:11:32:DE:M0:02", "mtu": 9000, "speed": 1000, "status": "connected", "use_dhcp": false},
-	{"id": "ovs_bond0", "ifname": "Bond 1", "type": "bond", "ip": "192.168.1.37", "mask": "255.255.255.0", "mac": "00:11:32:DE:M0:03", "mtu": 1500, "speed": 4000, "status": "connected", "use_dhcp": false},
-	{"id": "tailscale0", "ifname": "Tailscale", "type": "vpn", "ip": "100.123.191.95", "mask": "255.255.255.255", "gateway": "100.100.100.100", "mac": "", "mtu": 1280, "speed": 0, "status": "connected", "use_dhcp": false},
+	{"id": "ovs_bond0", "ifname": "Bond 1", "type": "bond", "ip": "10.24.8.37", "mask": "255.255.255.0", "mac": "00:11:32:DE:M0:03", "mtu": 1500, "speed": 4000, "status": "connected", "use_dhcp": false},
+	{"id": "tailscale0", "ifname": "Tailscale", "type": "vpn", "ip": "100.64.12.34", "mask": "255.255.255.255", "gateway": "100.100.100.100", "mac": "", "mtu": 1280, "speed": 0, "status": "connected", "use_dhcp": false},
 }
 
 // — logs —
@@ -411,7 +411,7 @@ var demoLogs = map[string][]map[string]any{
 		logEntry(time.Now().Add(-32*time.Minute), "warn", "System", "", "Disk SMART warning", "sdc reported 4 reallocated sectors (was 3). Consider replacement."),
 		logEntry(time.Now().Add(-1*time.Hour), "info", "Package", "", "Synology Drive started", "Service started after auto-update to 3.1.0-22920."),
 		logEntry(time.Now().Add(-90*time.Minute), "info", "Hyper Backup", "", "Backup task completed", `"Daily homes → /volume2/backups" finished in 22m 14s.`),
-		logEntry(time.Now().Add(-2*time.Hour), "info", "baraniewski", "192.168.1.5", "User logged in", "Login via DSM web UI from 192.168.1.5."),
+		logEntry(time.Now().Add(-2*time.Hour), "info", "operator", "10.24.8.15", "User logged in", "Login via DSM web UI from 10.24.8.15."),
 		logEntry(time.Now().Add(-3*time.Hour), "warn", "Network", "", "Tailscale reconnected", "Tailscale lost connection at 17:02; auto-reconnected at 17:03."),
 		logEntry(time.Now().Add(-4*time.Hour), "info", "System", "", "Scheduled task triggered", `"Antivirus weekly scan" started.`),
 		logEntry(time.Now().Add(-5*time.Hour), "err", "Surveillance", "", "Camera disconnected", "Front Door camera unreachable for 3 minutes — recordings paused."),
@@ -423,16 +423,16 @@ var demoLogs = map[string][]map[string]any{
 		logEntry(time.Now().Add(-13*time.Hour), "info", "Hyper Backup", "", "Backup task completed", `"Monthly cold storage → external" finished in 4h 38m.`),
 		logEntry(time.Now().Add(-14*time.Hour), "err", "guest", "203.0.113.42", "Login blocked", "5 failed login attempts → IP auto-banned for 24h."),
 		logEntry(time.Now().Add(-18*time.Hour), "info", "System", "", "NTP sync", "Time synchronised with pool.ntp.org (offset -0.142s)."),
-		logEntry(time.Now().Add(-22*time.Hour), "info", "Package", "", "Active Backup ran", "laptop-jan ran scheduled backup (incremental, 412 MB)."),
+		logEntry(time.Now().Add(-22*time.Hour), "info", "Package", "", "Active Backup ran", "workstation-a ran scheduled backup (incremental, 412 MB)."),
 		logEntry(time.Now().Add(-26*time.Hour), "warn", "Storage", "", "Volume nearly full", "Volume 1 used 91% — consider clean-up or expansion."),
 		logEntry(time.Now().Add(-30*time.Hour), "info", "System", "", "Daily housekeeping", "Recycle bin auto-purge removed 38 items (1.4 GB)."),
 	},
 	"connection": {
-		logEntry(time.Now().Add(-1*time.Hour), "info", "baraniewski", "192.168.1.5", "SMB connected", `Mounted "homes" via SMB.`),
-		logEntry(time.Now().Add(-2*time.Hour), "info", "baraniewski", "100.123.191.95", "WebDAV connected", `Accessed "/code" via WebDAV.`),
+		logEntry(time.Now().Add(-1*time.Hour), "info", "operator", "10.24.8.15", "SMB connected", `Mounted "homes" via SMB.`),
+		logEntry(time.Now().Add(-2*time.Hour), "info", "operator", "100.64.12.34", "WebDAV connected", `Accessed "/code" via WebDAV.`),
 		logEntry(time.Now().Add(-3*time.Hour), "info", "demo", "10.0.0.42", "SFTP connected", "SFTP session opened."),
-		logEntry(time.Now().Add(-4*time.Hour), "info", "baraniewski", "192.168.1.5", "AFP connected", `Mounted "video" via AFP.`),
-		logEntry(time.Now().Add(-6*time.Hour), "info", "backup-svc", "192.168.1.10", "rsync connected", "rsyncd session opened from 192.168.1.10."),
+		logEntry(time.Now().Add(-4*time.Hour), "info", "operator", "10.24.8.15", "AFP connected", `Mounted "video" via AFP.`),
+		logEntry(time.Now().Add(-6*time.Hour), "info", "backup-svc", "10.24.8.20", "rsync connected", "rsyncd session opened from 10.24.8.20."),
 	},
 }
 
@@ -671,7 +671,7 @@ var demoDockerImages = []map[string]any{
 var demoDockerNetworks = []map[string]any{
 	{"id": "net_bridge", "name": "bridge", "driver": "bridge", "scope": "local", "containers": 4},
 	{"id": "net_host", "name": "host", "driver": "host", "scope": "local", "containers": 1},
-	{"id": "net_homelab", "name": "homelab", "driver": "bridge", "scope": "local", "containers": 3},
+	{"id": "net_lab", "name": "lab", "driver": "bridge", "scope": "local", "containers": 3},
 }
 
 // — surveillance —
@@ -705,9 +705,9 @@ var demoHyperBackupTasks = []map[string]any{
 }
 
 var demoActiveBackupTasks = []map[string]any{
-	{"task_id": 11, "name": "laptop-jan", "source_type": "device", "target": "/volume2/active-backup", "last_run": time.Now().Add(-22 * time.Hour).Unix(), "status": "success"},
-	{"task_id": 12, "name": "laptop-kasia", "source_type": "device", "target": "/volume2/active-backup", "last_run": time.Now().Add(-48 * time.Hour).Unix(), "status": "success"},
-	{"task_id": 13, "name": "vm-homelab", "source_type": "vm", "target": "/volume2/active-backup", "last_run": time.Now().Add(-10 * 24 * time.Hour).Unix(), "status": "failed"},
+	{"task_id": 11, "name": "workstation-a", "source_type": "device", "target": "/volume2/active-backup", "last_run": time.Now().Add(-22 * time.Hour).Unix(), "status": "success"},
+	{"task_id": 12, "name": "workstation-b", "source_type": "device", "target": "/volume2/active-backup", "last_run": time.Now().Add(-48 * time.Hour).Unix(), "status": "success"},
+	{"task_id": 13, "name": "vm-lab", "source_type": "vm", "target": "/volume2/active-backup", "last_run": time.Now().Add(-10 * 24 * time.Hour).Unix(), "status": "failed"},
 }
 
 var demoActiveBackupVersions = []map[string]any{
@@ -733,7 +733,7 @@ var demoCloudSyncTasks = []map[string]any{
 		"current_status": "Up to date",
 		"local_path":     "/volume1/cloud-sync",
 		"link_remote":    "/Apps/SynologyCloudSync",
-		"username":       "jan@example.com",
+		"username":       "operator@example.test",
 		"account_id":     "dbid:AAAA-demo-1",
 		"direction":      0, // bidirectional
 		"last_sync_time": time.Now().Add(-7 * time.Minute).Unix(),
@@ -748,8 +748,8 @@ var demoCloudSyncTasks = []map[string]any{
 		"link_status":    "connected",
 		"current_status": "Idle",
 		"local_path":     "/volume1/gdrive-mirror",
-		"link_remote":    "/My Drive/homelab-mirror",
-		"username":       "jan@example.com",
+		"link_remote":    "/My Drive/lab-mirror",
+		"username":       "operator@example.test",
 		"account_id":     "google:114-demo",
 		"direction":      2, // download-only
 		"last_sync_time": time.Now().Add(-26 * time.Hour).Unix(),
@@ -764,8 +764,8 @@ var demoCloudSyncTasks = []map[string]any{
 		"link_status":    "connected",
 		"current_status": "Up to date",
 		"local_path":     "/volume2/archive",
-		"link_remote":    "s3://homelab-cold-archive/synology",
-		"username":       "AKIAIOSFODNN7EXAMPLE",
+		"link_remote":    "s3://lab-cold-archive/synology",
+		"username":       "demo-access-key",
 		"account_id":     "s3:demo-bucket",
 		"direction":      1, // upload-only
 		"last_sync_time": time.Now().Add(-7 * 24 * time.Hour).Unix(),
@@ -781,7 +781,7 @@ var demoCloudSyncTasks = []map[string]any{
 		"current_status": "Error: token expired",
 		"local_path":     "/volume1/work-docs",
 		"link_remote":    "/Documents/Work",
-		"username":       "jan@example.org",
+		"username":       "operator.secondary@example.test",
 		"account_id":     "ms:demo-tenant",
 		"direction":      0, // bidirectional
 		"last_sync_time": time.Now().Add(-3 * 24 * time.Hour).Unix(),
@@ -794,9 +794,9 @@ var demoCloudSyncTasks = []map[string]any{
 // — drive —
 
 var demoDriveFiles = []map[string]any{
-	{"name": "Q4-planning.gdoc", "path": "/Drive/Q4-planning.gdoc", "size": 124_280, "type": "document", "modified": time.Now().Add(-6 * time.Hour).Unix(), "owner": "baraniewski"},
-	{"name": "homelab-roadmap.gsheet", "path": "/Drive/homelab-roadmap.gsheet", "size": 88_412, "type": "spreadsheet", "modified": time.Now().Add(-2 * 24 * time.Hour).Unix(), "owner": "baraniewski"},
-	{"name": "talk-slides.gslides", "path": "/Drive/talk-slides.gslides", "size": 1_412_408, "type": "presentation", "modified": time.Now().Add(-4 * 24 * time.Hour).Unix(), "owner": "baraniewski"},
+	{"name": "Q4-planning.gdoc", "path": "/Drive/Q4-planning.gdoc", "size": 124_280, "type": "document", "modified": time.Now().Add(-6 * time.Hour).Unix(), "owner": "operator"},
+	{"name": "lab-roadmap.gsheet", "path": "/Drive/lab-roadmap.gsheet", "size": 88_412, "type": "spreadsheet", "modified": time.Now().Add(-2 * 24 * time.Hour).Unix(), "owner": "operator"},
+	{"name": "talk-slides.gslides", "path": "/Drive/talk-slides.gslides", "size": 1_412_408, "type": "presentation", "modified": time.Now().Add(-4 * 24 * time.Hour).Unix(), "owner": "operator"},
 	{"name": "video-2026-05-01.mp4", "path": "/Drive/video-2026-05-01.mp4", "size": 482_412_408, "type": "video", "modified": time.Now().Add(-18 * 24 * time.Hour).Unix(), "owner": "demo"},
 }
 
@@ -820,7 +820,7 @@ func cert(id, cn, issuer string, expiresIn time.Duration, isDefault bool) map[st
 
 var demoCertificates = []map[string]any{
 	cert("default", "demo-ds923.local", "synology", 8*365*24*time.Hour, false),
-	cert("letsencrypt-1", "homelab.example.com", "Let's Encrypt R3", 60*24*time.Hour, true),
+	cert("letsencrypt-1", "lab.example.com", "Let's Encrypt R3", 60*24*time.Hour, true),
 	cert("letsencrypt-2", "vpn.example.com", "Let's Encrypt R3", 8*24*time.Hour, false), // expiry warn
 	cert("self-signed-old", "old-host.lan", "Synology Inc.", -7*24*time.Hour, false),    // already expired
 }
@@ -842,8 +842,8 @@ var demoSecAdvisorItems = []map[string]any{
 var demoSchedTasks = []map[string]any{
 	{"id": 1, "name": "Antivirus weekly scan", "type": "antivirus", "enable": true, "next_trigger_time": time.Now().Add(4 * 24 * time.Hour).Unix(), "owner": "system", "repeat": "weekly"},
 	{"id": 2, "name": "Synology Drive index rebuild", "type": "package", "enable": true, "next_trigger_time": time.Now().Add(20 * 24 * time.Hour).Unix(), "owner": "system", "repeat": "monthly"},
-	{"id": 3, "name": "Photo upload script", "type": "user-defined", "enable": false, "next_trigger_time": 0, "owner": "baraniewski", "repeat": "daily"},
-	{"id": 4, "name": "Quarterly cold-storage rotation", "type": "user-defined", "enable": true, "next_trigger_time": time.Now().Add(80 * 24 * time.Hour).Unix(), "owner": "baraniewski", "repeat": "quarterly"},
+	{"id": 3, "name": "Photo upload script", "type": "user-defined", "enable": false, "next_trigger_time": 0, "owner": "operator", "repeat": "daily"},
+	{"id": 4, "name": "Quarterly cold-storage rotation", "type": "user-defined", "enable": true, "next_trigger_time": time.Now().Add(80 * 24 * time.Hour).Unix(), "owner": "operator", "repeat": "quarterly"},
 	{"id": 5, "name": "S.M.A.R.T. extended test", "type": "smart", "enable": true, "next_trigger_time": time.Now().Add(11 * 24 * time.Hour).Unix(), "owner": "system", "repeat": "monthly"},
 }
 
@@ -857,11 +857,11 @@ var demoFirewallProfiles = []map[string]any{
 }
 
 var demoFirewallRules = []map[string]any{
-	{"id": 1, "name": "Allow LAN", "enabled": true, "action": "allow", "protocol": "all", "source": "192.168.1.0/24", "dest_port": "all"},
+	{"id": 1, "name": "Allow LAN", "enabled": true, "action": "allow", "protocol": "all", "source": "10.24.8.0/24", "dest_port": "all"},
 	{"id": 2, "name": "Allow Tailscale", "enabled": true, "action": "allow", "protocol": "all", "source": "100.64.0.0/10", "dest_port": "all"},
 	{"id": 3, "name": "Allow HTTPS", "enabled": true, "action": "allow", "protocol": "tcp", "source": "any", "dest_port": "443"},
 	{"id": 4, "name": "Allow HTTP", "enabled": true, "action": "allow", "protocol": "tcp", "source": "any", "dest_port": "80"},
-	{"id": 5, "name": "Allow SSH from LAN only", "enabled": true, "action": "allow", "protocol": "tcp", "source": "192.168.1.0/24", "dest_port": "22"},
+	{"id": 5, "name": "Allow SSH from LAN only", "enabled": true, "action": "allow", "protocol": "tcp", "source": "10.24.8.0/24", "dest_port": "22"},
 	{"id": 6, "name": "Block country: RU", "enabled": true, "action": "deny", "protocol": "all", "source": "geo:RU", "dest_port": "all"},
 	{"id": 7, "name": "Block country: CN", "enabled": true, "action": "deny", "protocol": "all", "source": "geo:CN", "dest_port": "all"},
 	{"id": 8, "name": "Default deny", "enabled": true, "action": "deny", "protocol": "all", "source": "any", "dest_port": "all"},
@@ -876,8 +876,8 @@ var demoDDNSProviders = []map[string]any{
 
 var demoDDNSRecords = []map[string]any{
 	{"hostname": "demo-ds923.synology.me", "provider": "Synology", "ipv4": "203.0.113.42", "ipv6": "2001:db8::42", "status": "OK", "last_updated": time.Now().Add(-15 * time.Minute).Unix(), "enabled": true},
-	{"hostname": "homelab.dyndns.org", "provider": "DynDNS", "ipv4": "203.0.113.42", "ipv6": "", "status": "OK", "last_updated": time.Now().Add(-32 * time.Minute).Unix(), "enabled": true},
-	{"hostname": "vpn.cloudflare.net", "provider": "Cloudflare", "ipv4": "203.0.113.42", "ipv6": "2001:db8::42", "status": "OK", "last_updated": time.Now().Add(-5 * time.Minute).Unix(), "enabled": true},
+	{"hostname": "lab.example.net", "provider": "DynDNS", "ipv4": "203.0.113.42", "ipv6": "", "status": "OK", "last_updated": time.Now().Add(-32 * time.Minute).Unix(), "enabled": true},
+	{"hostname": "vpn.example.net", "provider": "Cloudflare", "ipv4": "203.0.113.42", "ipv6": "2001:db8::42", "status": "OK", "last_updated": time.Now().Add(-5 * time.Minute).Unix(), "enabled": true},
 }
 
 // — notifications —
@@ -889,9 +889,9 @@ var demoNotificationSettings = map[string]any{
 	"push_enable":          true,
 	"sms_enable":           false,
 	"dsm_enable":           true,
-	"primary_email":        "jan@example.com",
-	"secondary_email":      "ops-alerts@example.com",
-	"recipients":           []string{"jan@example.com", "ops-alerts@example.com"},
+	"primary_email":        "operator@example.test",
+	"secondary_email":      "ops-alerts@example.test",
+	"recipients":           []string{"operator@example.test", "ops-alerts@example.test"},
 	"recent_failure_count": 0,
 }
 
@@ -902,40 +902,40 @@ var demoNotificationSettings = map[string]any{
 var demoNotificationLog = []map[string]any{
 	{"time": time.Now().Add(-12 * time.Minute).Unix(), "severity": "warning", "channel": "email",
 		"subject": "Disk SMART warning", "message": "sdc reported 4 reallocated sectors (was 3). Consider replacement.",
-		"recipient": "jan@example.com", "status": "success"},
+		"recipient": "operator@example.test", "status": "success"},
 	{"time": time.Now().Add(-45 * time.Minute).Unix(), "severity": "info", "channel": "push",
 		"subject": "Backup task completed", "message": `"Daily homes → /volume2/backups" finished in 22m 14s.`,
-		"recipient": "Pushover (iPhone 15)", "status": "success"},
+		"recipient": "Pushover (mobile)", "status": "success"},
 	{"time": time.Now().Add(-3 * time.Hour).Unix(), "severity": "info", "channel": "dsm",
-		"subject": "Login from new device", "message": "Login from 192.168.1.5 using DSM web UI (user: baraniewski).",
+		"subject": "Login from new device", "message": "Login from 10.24.8.15 using DSM web UI (user: operator).",
 		"recipient": "DSM", "status": "success"},
 	{"time": time.Now().Add(-8 * time.Hour).Unix(), "severity": "error", "channel": "email",
 		"subject": "Camera disconnected", "message": "Front Door camera unreachable for 3 minutes — recordings paused.",
-		"recipient": "ops-alerts@example.com", "status": "success"},
+		"recipient": "ops-alerts@example.test", "status": "success"},
 	{"time": time.Now().Add(-26 * time.Hour).Unix(), "severity": "warning", "channel": "push",
 		"subject": "SSL cert expiring", "message": "Let's Encrypt certificate for nas.example.com expires in 14 days.",
-		"recipient": "Pushover (iPhone 15)", "status": "success"},
+		"recipient": "Pushover (mobile)", "status": "success"},
 	{"time": time.Now().Add(-2 * 24 * time.Hour).Unix(), "severity": "info", "channel": "email",
 		"subject": "Scheduled task triggered", "message": `"Antivirus weekly scan" started; ETA 1h 12m.`,
-		"recipient": "jan@example.com", "status": "success"},
+		"recipient": "operator@example.test", "status": "success"},
 	{"time": time.Now().Add(-3 * 24 * time.Hour).Unix(), "severity": "info", "channel": "dsm",
 		"subject": "Snapshot rotation", "message": "Removed 3 expired daily snapshots from /volume1/photo.",
 		"recipient": "DSM", "status": "success"},
 	{"time": time.Now().Add(-4 * 24 * time.Hour).Unix(), "severity": "warning", "channel": "email",
 		"subject": "Quota nearing limit", "message": "Share photo at 89% of configured quota (1.78 TiB of 2 TiB).",
-		"recipient": "jan@example.com", "status": "success"},
+		"recipient": "operator@example.test", "status": "success"},
 	{"time": time.Now().Add(-5 * 24 * time.Hour).Unix(), "severity": "info", "channel": "push",
 		"subject": "Package updated", "message": "Synology Drive auto-updated to 3.5.0-26100.",
-		"recipient": "Pushover (iPhone 15)", "status": "success"},
+		"recipient": "Pushover (mobile)", "status": "success"},
 	{"time": time.Now().Add(-5*24*time.Hour - 4*time.Hour).Unix(), "severity": "error", "channel": "email",
 		"subject": "Hyper Backup task failed", "message": `"Offsite Backblaze" failed: destination throttled (HTTP 503). Retry queued.`,
-		"recipient": "ops-alerts@example.com", "status": "failed"},
+		"recipient": "ops-alerts@example.test", "status": "failed"},
 	{"time": time.Now().Add(-6 * 24 * time.Hour).Unix(), "severity": "info", "channel": "dsm",
 		"subject": "Volume scrub completed", "message": "Volume 1 scrub completed; 0 errors across 6.4 TiB.",
 		"recipient": "DSM", "status": "success"},
 	{"time": time.Now().Add(-7 * 24 * time.Hour).Unix(), "severity": "warning", "channel": "push",
 		"subject": "Failed login attempt", "message": "3 failed admin logins from 203.0.113.99 (auto-blocked).",
-		"recipient": "Pushover (iPhone 15)", "status": "success"},
+		"recipient": "Pushover (mobile)", "status": "success"},
 }
 
 // — user quotas —
@@ -944,7 +944,7 @@ var demoNotificationLog = []map[string]any{
 // in MiB in this endpoint, so the numbers below are MiB and the view
 // rolls them up to GiB / TiB for display.
 var demoUserQuotas = []map[string]any{
-	{"name": "baraniewski", "uid": 1026, "quota": 524_288, "used": 312_456,
+	{"name": "operator", "uid": 1026, "quota": 524_288, "used": 312_456,
 		"volumes": []map[string]any{
 			{"share": "volume1", "user_quota": 262_144, "used_quota": 198_320},
 			{"share": "volume2", "user_quota": 262_144, "used_quota": 114_136},
@@ -957,7 +957,7 @@ var demoUserQuotas = []map[string]any{
 		"volumes": []map[string]any{
 			{"share": "volume2", "user_quota": 1_048_576, "used_quota": 892_104},
 		}},
-	{"name": "kid", "uid": 1030, "quota": 20_480, "used": 18_960,
+	{"name": "limited", "uid": 1030, "quota": 20_480, "used": 18_960,
 		"volumes": []map[string]any{
 			{"share": "volume1", "user_quota": 20_480, "used_quota": 18_960},
 		}},
@@ -966,7 +966,7 @@ var demoUserQuotas = []map[string]any{
 // — virtual machine manager —
 //
 // Three plausible guests so the VMM view exercises every status it
-// renders: a running Home Assistant guest (the canonical homelab VM),
+// renders: a running Home Assistant guest (the canonical lab VM),
 // a shutoff debian sandbox, and a running Win11 guest with auto_run
 // turned on so the boot-with-host indicator has something to display.
 
@@ -1013,7 +1013,7 @@ var demoVMHosts = []map[string]any{
 	{
 		"id":        "host-demo-ds923",
 		"name":      "demo-ds923",
-		"host_ip":   "192.168.1.42",
+		"host_ip":   "10.24.8.42",
 		"vm_count":  3,
 		"cpu_usage": 27.4,
 		"ram_total": 8192,
@@ -1026,8 +1026,8 @@ var demoVMHosts = []map[string]any{
 //
 // Two targets so the view exercises both common states: a healthy
 // "vmware-cluster" target with two active initiator connections, and a
-// disabled "legacy-mac" target that the operator's left configured but
-// turned off. CHAP auth is enabled on the active target.
+// disabled "legacy-mac" target that stays configured but turned off.
+// CHAP auth is enabled on the active target.
 //
 // Three LUNs so the view exercises every backing type DSM exposes: a
 // thin-provisioned file LUN, a block-level LUN, and a newer pool-based

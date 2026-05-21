@@ -16,8 +16,14 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/demo"
 	"github.com/janbaraniewski/synology-ctl/internal/dsm"
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
-	"github.com/janbaraniewski/synology-ctl/internal/tui/views"
 )
+
+const defaultDemoHostLabel = "demo-nas.local:5000"
+
+type demoOptions struct {
+	hostLabel string
+	seed      uint64
+}
 
 // newDemoCmd returns the `synoctl demo` subcommand. It starts an
 // in-process mock DSM server, points a regular dsm.Client at it, and
@@ -28,27 +34,35 @@ import (
 // and doesn't write anything (Keychain or otherwise). It exists only
 // for the duration of the TUI session.
 func newDemoCmd() *cobra.Command {
-	return &cobra.Command{
+	opts := demoOptions{hostLabel: defaultDemoHostLabel, seed: 1}
+	cmd := &cobra.Command{
 		Use:   "demo",
-		Short: "Launch the TUI against an in-process mock DSM (no real NAS required)",
+		Short: "Launch a fully populated recording demo (no real NAS required)",
 		Long: `Launch the synoctl TUI against an in-process mock DSM server populated
-with realistic demo data. Every view renders without touching a real
-device, so the binary is screenshot-ready out of the box.
+with realistic, anonymous demo data. Every sidebar view renders without
+touching a real device, so the binary is screenshot-ready out of the box.
 
-Use this for README / docs screenshots, or to explore synoctl's surface
-before pointing it at your own NAS.
+Use this for README / docs screenshots, GIF recording, or to explore
+synoctl's surface before pointing it at your own NAS. The UI talks to a
+local throwaway DSM simulation, but the top bar shows a stable demo NAS
+label by default so recordings do not leak localhost ports.
 
 Nothing is read from or written to your config (~/.config/synoctl) or
 Keychain — the mock server lives only for the duration of this session.`,
-		RunE: runDemo,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDemo(cmd, args, opts)
+		},
 	}
+	cmd.Flags().StringVar(&opts.hostLabel, "host-label", defaultDemoHostLabel, "host:port label shown in the TUI top bar")
+	cmd.Flags().Uint64Var(&opts.seed, "seed", 1, "seed for repeatable live demo metrics; use 0 for a fresh random seed")
+	return cmd
 }
 
 // runDemo wires the mock server + a real dsm.Client + the full TUI.
-func runDemo(cmd *cobra.Command, _ []string) error {
+func runDemo(cmd *cobra.Command, _ []string, opts demoOptions) error {
 	ctx := cmd.Context()
 
-	srv := demo.New()
+	srv := demo.New(demo.Options{Seed: opts.seed})
 	defer srv.Close()
 
 	host, port, err := splitHostPort(srv.HostPort())
@@ -57,10 +71,11 @@ func runDemo(cmd *cobra.Command, _ []string) error {
 	}
 
 	client, err := dsm.New(dsm.Options{
-		Scheme:  "http", // local httptest server is plaintext
-		Host:    host,
-		Port:    port,
-		Timeout: 30 * time.Second,
+		Scheme:      "http", // local httptest server is plaintext
+		Host:        host,
+		Port:        port,
+		DisplayHost: opts.hostLabel,
+		Timeout:     30 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("demo: build dsm client: %w", err)
@@ -92,53 +107,7 @@ func runDemo(cmd *cobra.Command, _ []string) error {
 	logger := log.NewWithOptions(os.Stderr, log.Options{ReportTimestamp: false, Prefix: "tui-demo"})
 	vctx := tui.ViewContext{Client: client, Theme: theme, Keys: tui.DefaultKeys(), Logger: logger}
 
-	sections := []tui.NavSection{
-		{Name: "Overview", Views: []tui.View{
-			views.NewDashboard(vctx),
-			views.NewResourceMonitor(vctx),
-		}},
-		{Name: "Storage", Views: []tui.View{
-			views.NewVolumes(vctx),
-			views.NewFiles(vctx),
-			views.NewISCSI(vctx),
-		}},
-		{Name: "Apps", Views: []tui.View{
-			views.NewApps(vctx),
-			views.NewContainers(vctx),
-			views.NewVMM(vctx),
-		}},
-		{Name: "Backup", Views: []tui.View{
-			views.NewHyperBackup(vctx),
-			views.NewActiveBackup(vctx),
-			views.NewCloudSync(vctx),
-		}},
-		{Name: "Services", Views: []tui.View{
-			views.NewDrive(vctx),
-			views.NewSurveillance(vctx),
-		}},
-		{Name: "Security", Views: []tui.View{
-			views.NewCerts(vctx),
-			views.NewSecurityAdvisor(vctx),
-			views.NewFirewall(vctx),
-		}},
-		{Name: "System", Views: []tui.View{
-			views.NewAdminPage(vctx),
-			views.NewQuotas(vctx),
-			views.NewSchedTasks(vctx),
-			views.NewDDNS(vctx),
-			views.NewNotifications(vctx),
-		}},
-		{Name: "Settings", Views: []tui.View{
-			views.NewDSMUpdate(vctx),
-			views.NewTimeRegion(vctx),
-			views.NewPower(vctx),
-			views.NewExternalAccess(vctx),
-		}},
-		{Name: "Tools", Views: []tui.View{
-			views.NewExplorer(vctx),
-		}},
-	}
-	app := tui.NewApp(client, theme, logger, sections)
+	app := tui.NewApp(client, theme, logger, appSections(vctx))
 	prog := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = prog.Run()
 	return err

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/rand/v2"
 	"net/url"
 	"strconv"
 	"strings"
@@ -159,7 +158,7 @@ func (s *Server) handleLogin(_ *Server, _ url.Values) any {
 		"did":       "demo-device-token",
 		"device_id": "demo-device-token", // both names, per the DSM 7.0.1 quirk we wrote about
 		"synotoken": "demo-csrf",
-		"account":   "baraniewski",
+		"account":   "operator",
 	}
 }
 
@@ -219,32 +218,32 @@ func (s *Server) handleUtilization(_ *Server, form url.Values) any {
 	// Resource Monitor view can draw a sparkline.
 	switch form.Get("type") {
 	case "", "current":
-		return demoLiveUtilization()
+		return s.demoLiveUtilization()
 	case "hour":
-		return demoUtilSeries(60)
+		return s.demoUtilSeries(60)
 	case "day":
-		return demoUtilSeries(96)
+		return s.demoUtilSeries(96)
 	case "week":
-		return demoUtilSeries(84)
+		return s.demoUtilSeries(84)
 	case "month":
-		return demoUtilSeries(60)
+		return s.demoUtilSeries(60)
 	case "year":
-		return demoUtilSeries(52)
+		return s.demoUtilSeries(52)
 	default:
-		return demoLiveUtilization()
+		return s.demoLiveUtilization()
 	}
 }
 
 // demoLiveUtilization returns a single in-the-moment utilisation sample
 // with the "alive but not stressed" bias.
-func demoLiveUtilization() map[string]any {
-	cpuUser := 8 + rand.IntN(12)
-	cpuSys := 4 + rand.IntN(6)
-	cpuOther := 2 + rand.IntN(4)
-	memUse := 58 + rand.IntN(8) // %
-	rx := int64(2_500_000 + rand.IntN(8_000_000))
-	tx := int64(400_000 + rand.IntN(1_200_000))
-	diskUtil := 18 + rand.IntN(40)
+func (s *Server) demoLiveUtilization() map[string]any {
+	cpuUser := 8 + s.intN(12)
+	cpuSys := 4 + s.intN(6)
+	cpuOther := 2 + s.intN(4)
+	memUse := 58 + s.intN(8) // %
+	rx := int64(2_500_000 + s.intN(8_000_000))
+	tx := int64(400_000 + s.intN(1_200_000))
+	diskUtil := 18 + s.intN(40)
 	return map[string]any{
 		"cpu": map[string]any{
 			"1min_load":   17,
@@ -298,7 +297,7 @@ func demoLiveUtilization() map[string]any {
 // stressed bias as demoLiveUtilization, with a slow sinusoidal trend on
 // top of the per-slot noise so the resulting sparkline reads like real
 // activity rather than a flat random walk.
-func demoUtilSeries(n int) []map[string]any {
+func (s *Server) demoUtilSeries(n int) []map[string]any {
 	if n <= 0 {
 		n = 1
 	}
@@ -310,13 +309,13 @@ func demoUtilSeries(n int) []map[string]any {
 		phase := float64(i) / float64(n)
 		trend := 0.5 + 0.4*math.Sin(phase*2*math.Pi*3)
 
-		cpuUser := int(8 + trend*10 + float64(rand.IntN(6)))
-		cpuSys := int(4 + trend*4 + float64(rand.IntN(3)))
-		cpuOther := 2 + rand.IntN(4)
-		memUse := int(56 + trend*8 + float64(rand.IntN(3))) // %
-		rx := int64(1_500_000 + int64(trend*9_000_000) + int64(rand.IntN(1_200_000)))
-		tx := int64(300_000 + int64(trend*1_500_000) + int64(rand.IntN(400_000)))
-		diskUtil := int(15 + trend*45 + float64(rand.IntN(8)))
+		cpuUser := int(8 + trend*10 + float64(s.intN(6)))
+		cpuSys := int(4 + trend*4 + float64(s.intN(3)))
+		cpuOther := 2 + s.intN(4)
+		memUse := int(56 + trend*8 + float64(s.intN(3))) // %
+		rx := int64(1_500_000 + int64(trend*9_000_000) + int64(s.intN(1_200_000)))
+		tx := int64(300_000 + int64(trend*1_500_000) + int64(s.intN(400_000)))
+		diskUtil := int(15 + trend*45 + float64(s.intN(8)))
 
 		// Per-slot timestamp: oldest first, latest last.
 		slotTime := now - int64(float64(n-1-i)*sliceSecondsForCount(n))

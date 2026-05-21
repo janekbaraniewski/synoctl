@@ -18,9 +18,10 @@ import (
 
 // Client talks to a single DSM endpoint.
 type Client struct {
-	baseURL  *url.URL
-	http     *http.Client
-	insecure bool
+	baseURL     *url.URL
+	displayHost string
+	http        *http.Client
+	insecure    bool
 
 	mu         sync.RWMutex
 	sid        string             // session id from login
@@ -38,11 +39,12 @@ type apiInfo struct {
 
 // Options configures the client.
 type Options struct {
-	Scheme   string        // "http" or "https"; defaults to https
-	Host     string        // hostname or IP, no port
-	Port     int           // DSM port; defaults to 5001 (https) or 5000 (http)
-	Insecure bool          // skip TLS verification (self-signed certs)
-	Timeout  time.Duration // per-request timeout; default 20s
+	Scheme      string        // "http" or "https"; defaults to https
+	Host        string        // hostname or IP, no port
+	Port        int           // DSM port; defaults to 5001 (https) or 5000 (http)
+	DisplayHost string        // optional host:port label for UI display only
+	Insecure    bool          // skip TLS verification (self-signed certs)
+	Timeout     time.Duration // per-request timeout; default 20s
 }
 
 // New constructs a Client. The returned client is unauthenticated; call
@@ -80,8 +82,9 @@ func New(opts Options) (*Client, error) {
 		}).DialContext,
 	}
 	return &Client{
-		baseURL:  base,
-		insecure: opts.Insecure,
+		baseURL:     base,
+		displayHost: opts.DisplayHost,
+		insecure:    opts.Insecure,
 		http: &http.Client{
 			Transport: tr,
 			Timeout:   timeout,
@@ -90,8 +93,14 @@ func New(opts Options) (*Client, error) {
 	}, nil
 }
 
-// Host returns the host:port of the configured endpoint.
-func (c *Client) Host() string { return c.baseURL.Host }
+// Host returns the host:port label shown in the UI. By default it is the
+// configured endpoint, but callers can override it for local simulations.
+func (c *Client) Host() string {
+	if c.displayHost != "" {
+		return c.displayHost
+	}
+	return c.baseURL.Host
+}
 
 // Insecure reports whether TLS verification is disabled.
 func (c *Client) Insecure() bool { return c.insecure }

@@ -40,6 +40,16 @@ mDNS / subnet sweep / Tailscale peers
 
 After that, `synoctl` jumps straight into the workspace.
 
+For recording screenshots or GIFs without a NAS:
+
+```bash
+synoctl demo
+```
+
+The demo runs the full TUI against an in-process DSM simulation with
+anonymous data, repeatable live metrics, and a stable `demo-nas.local:5000`
+host label in the top bar.
+
 ## What You Get
 
 | Area | What it does |
@@ -86,6 +96,7 @@ After that, `synoctl` jumps straight into the workspace.
 | `synoctl discover` | mDNS, subnet sweep, and Tailscale peer enumeration. |
 | `synoctl login` | Re-run onboarding and save/update a profile. |
 | `synoctl logout` | Remove the active profile password from Keychain. |
+| `synoctl demo [--seed N] [--host-label H]` | Launch the fully populated anonymous demo dashboard for screenshots/GIFs. |
 | `synoctl apis [-f X]` | Dump `SYNO.API.Info` for the active DSM build. |
 | `synoctl raw <api> <method> [-v N] [-p k=v]` | Call any DSM endpoint and print the JSON envelope. |
 | `synoctl version` | Build info. |

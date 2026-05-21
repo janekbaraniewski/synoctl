@@ -12,7 +12,6 @@ import (
 	"github.com/janbaraniewski/synology-ctl/internal/config"
 	"github.com/janbaraniewski/synology-ctl/internal/dsm"
 	"github.com/janbaraniewski/synology-ctl/internal/tui"
-	"github.com/janbaraniewski/synology-ctl/internal/tui/views"
 )
 
 // startTUI is the entry point invoked by `synoctl` (no subcommand). On
@@ -91,54 +90,7 @@ func startTUI(parentCtx context.Context) error {
 	theme := tui.DefaultTheme()
 	logger := log.NewWithOptions(os.Stderr, log.Options{ReportTimestamp: false, Prefix: "tui"})
 	vctx := tui.ViewContext{Client: client, Theme: theme, Keys: tui.DefaultKeys(), Logger: logger}
-
-	sections := []tui.NavSection{
-		{Name: "Overview", Views: []tui.View{
-			views.NewDashboard(vctx),
-			views.NewResourceMonitor(vctx),
-		}},
-		{Name: "Storage", Views: []tui.View{
-			views.NewVolumes(vctx),
-			views.NewFiles(vctx),
-			views.NewISCSI(vctx),
-		}},
-		{Name: "Apps", Views: []tui.View{
-			views.NewApps(vctx),
-			views.NewContainers(vctx),
-			views.NewVMM(vctx),
-		}},
-		{Name: "Backup", Views: []tui.View{
-			views.NewHyperBackup(vctx),
-			views.NewActiveBackup(vctx),
-			views.NewCloudSync(vctx),
-		}},
-		{Name: "Services", Views: []tui.View{
-			views.NewDrive(vctx),
-			views.NewSurveillance(vctx),
-		}},
-		{Name: "Security", Views: []tui.View{
-			views.NewCerts(vctx),
-			views.NewSecurityAdvisor(vctx),
-			views.NewFirewall(vctx),
-		}},
-		{Name: "System", Views: []tui.View{
-			views.NewAdminPage(vctx),
-			views.NewQuotas(vctx),
-			views.NewSchedTasks(vctx),
-			views.NewDDNS(vctx),
-			views.NewNotifications(vctx),
-		}},
-		{Name: "Settings", Views: []tui.View{
-			views.NewDSMUpdate(vctx),
-			views.NewTimeRegion(vctx),
-			views.NewPower(vctx),
-			views.NewExternalAccess(vctx),
-		}},
-		{Name: "Tools", Views: []tui.View{
-			views.NewExplorer(vctx),
-		}},
-	}
-	app := tui.NewApp(client, theme, logger, sections)
+	app := tui.NewApp(client, theme, logger, appSections(vctx))
 
 	prog := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = prog.Run()

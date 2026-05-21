@@ -5,11 +5,10 @@
 // realistic so the resulting screenshots sell the product.
 //
 // The server is mounted at a random localhost port; the regular
-// dsm.Client (no special "demo mode" flag, no fork in dsm/*.go) is
-// pointed at it, and the TUI is launched against it as if it were a
-// real DSM endpoint. Every code path that talks to DSM in production
-// is exercised by the demo too — the only difference is the data on
-// the wire.
+// dsm.Client is pointed at it, and the TUI is launched against it as if
+// it were a real DSM endpoint. Every code path that talks to DSM in
+// production is exercised by the demo too — the only difference is the
+// data on the wire.
 //
 // Adding a new view that hits a new endpoint: extend handlers.go with
 // one route and data.go with the canned payload, and the existing TUI
@@ -19,6 +18,7 @@ package demo
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -28,11 +28,19 @@ import (
 	"time"
 )
 
+// Options configures the in-process demo backend.
+type Options struct {
+	// Seed controls the pseudo-random live metrics returned by the demo.
+	// Use 0 to seed from the current time.
+	Seed uint64
+}
+
 // Server is the running demo backend. Caller closes it via Close().
 type Server struct {
 	httpsrv *httptest.Server
 
-	mu   sync.Mutex
+	mu   sync.Mutex // guards rng
+	rng  *rand.Rand
 	data *state // mutable in-memory state — snapshots created during the demo, etc.
 }
 
@@ -44,14 +52,30 @@ type Server struct {
 // created via the TUI are remembered for the lifetime of the demo,
 // so a screenshot showing the "after" of a snapshot-create flow
 // works without restarting.
-func New() *Server {
-	s := &Server{data: newState()}
+func New(options ...Options) *Server {
+	opts := Options{Seed: 1}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	if opts.Seed == 0 {
+		opts.Seed = uint64(time.Now().UnixNano())
+	}
+	s := &Server{
+		data: newState(),
+		rng:  rand.New(rand.NewPCG(opts.Seed, opts.Seed^0x9e3779b97f4a7c15)),
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webapi/entry.cgi", s.entryHandler)
 	mux.HandleFunc("/webapi/auth.cgi", s.entryHandler) // login routes here
 	mux.HandleFunc("/webapi/", s.entryHandler)         // catch-all for path-routed APIs
 	s.httpsrv = httptest.NewServer(mux)
 	return s
+}
+
+func (s *Server) intN(n int) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rng.IntN(n)
 }
 
 // HostPort returns "host:port" the dsm.Client should be configured
@@ -196,7 +220,7 @@ type snapshot struct {
 // uptimeStringDSM returns DSM's "dd:hh:mm:ss" format computed from
 // startedAt (offset by a hard-coded base so the demo always looks
 // like the box has been up for >5 months — more realistic for a
-// homelab NAS).
+// lab NAS).
 func (s *Server) uptimeStringDSM() string {
 	const baseDays = 169
 	d := time.Since(s.data.startedAt)
