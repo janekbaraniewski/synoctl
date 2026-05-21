@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.9](https://github.com/janekbaraniewski/synoctl/compare/v0.2.8...v0.2.9) (2026-05-21)
+
+
+### Features
+
+* add recording-ready demo dashboard ([#47](https://github.com/janekbaraniewski/synoctl/issues/47)) ([13da342](https://github.com/janekbaraniewski/synoctl/commit/13da342572c76688eb443cba3f8177fb695973d4))
+
+
+### Documentation
+
+* make site simulation interactive ([#45](https://github.com/janekbaraniewski/synoctl/issues/45)) ([3339255](https://github.com/janekbaraniewski/synoctl/commit/3339255ef8723fb176e2e7e30dededcb5a954c27))
+
 ## [0.2.8](https://github.com/janekbaraniewski/synoctl/compare/v0.2.7...v0.2.8) (2026-05-20)
 
 
