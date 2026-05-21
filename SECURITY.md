@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-synoctl follows semantic versioning. Security fixes land on the latest minor release line. Patch releases are cut as needed and published to the [GitHub releases page](https://github.com/janekbaraniewski/synology-ctl/releases).
+synoctl follows semantic versioning. Security fixes land on the latest minor release line. Patch releases are cut as needed and published to the [GitHub releases page](https://github.com/janekbaraniewski/synoctl/releases).
 
 | Version line | Supported |
 |---|---|
@@ -15,7 +15,7 @@ We aim to keep CVE windows short. If a high-severity issue is reported against a
 
 **Please do not file public GitHub issues for security problems.**
 
-Use [GitHub's private vulnerability reporting](https://github.com/janekbaraniewski/synology-ctl/security/advisories/new) instead. It opens a private advisory channel between you and the maintainers.
+Use [GitHub's private vulnerability reporting](https://github.com/janekbaraniewski/synoctl/security/advisories/new) instead. It opens a private advisory channel between you and the maintainers.
 
 If you can't use that channel, email `security@baraniewski.com` with:
 
@@ -63,4 +63,4 @@ This project participates in:
 - [OpenSSF Scorecard](https://scorecard.dev/) for supply-chain hygiene
 - [Sigstore cosign](https://www.sigstore.dev/) keyless signing of release binaries (GitHub OIDC identity)
 
-Release checksums are published alongside binaries on the [releases page](https://github.com/janekbaraniewski/synology-ctl/releases).
+Release checksums are published alongside binaries on the [releases page](https://github.com/janekbaraniewski/synoctl/releases).
