@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.11](https://github.com/janekbaraniewski/synoctl/compare/v0.2.10...v0.2.11) (2026-09-14)
+
+
+### Dependencies
+
+* **deps:** bump github.com/charmbracelet/x/ansi from 0.11.7 to 0.11.8 in the go-minor-and-patch group ([#68](https://github.com/janekbaraniewski/synoctl/issues/68)) ([5eef60b](https://github.com/janekbaraniewski/synoctl/commit/5eef60bc41c9b6176d2ab1257b20b32654b77cf8))
+* **deps:** bump golang.org/x/crypto from 0.51.0 to 0.52.0 ([#60](https://github.com/janekbaraniewski/synoctl/issues/60)) ([95ea4a1](https://github.com/janekbaraniewski/synoctl/commit/95ea4a11a2d89150dc4aa28f38256899e6b3033a))
+* **deps:** bump golang.org/x/net from 0.54.0 to 0.55.0 ([#57](https://github.com/janekbaraniewski/synoctl/issues/57)) ([5642966](https://github.com/janekbaraniewski/synoctl/commit/56429663bb2ea677d1b1e4a49c7f28323e7ede8d))
+
 ## [0.2.10](https://github.com/janekbaraniewski/synoctl/compare/v0.2.9...v0.2.10) (2026-05-26)
 
 
