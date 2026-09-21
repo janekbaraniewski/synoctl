@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.12](https://github.com/janekbaraniewski/synoctl/compare/v0.2.11...v0.2.12) (2026-09-21)
+
+
+### Dependencies
+
+* **deps:** bump github.com/dustin/go-humanize from 1.0.1 to 1.1.0 in the go-minor-and-patch group ([#72](https://github.com/janekbaraniewski/synoctl/issues/72)) ([90273ed](https://github.com/janekbaraniewski/synoctl/commit/90273edccd8d6343243dc5f3ee96778e83ca3e7f))
+
 ## [0.2.11](https://github.com/janekbaraniewski/synoctl/compare/v0.2.10...v0.2.11) (2026-09-14)
 
 
