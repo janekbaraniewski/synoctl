@@ -47,6 +47,9 @@ func (l *Logs) Bindings() []key.Binding {
 	)
 }
 
+// IsTextEditing defers global keys while the inline filter owns input.
+func (l *Logs) IsTextEditing() bool { return l.base.filter.IsActive() }
+
 func (l *Logs) Init() tea.Cmd { return l.fetch() }
 
 func (l *Logs) fetch() tea.Cmd {

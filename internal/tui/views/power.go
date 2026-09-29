@@ -47,6 +47,7 @@ func (v *PowerView) Name() string                   { return "power" }
 func (v *PowerView) Title() string                  { return "Power & Schedule" }
 func (v *PowerView) Icon() string                   { return "⏻" }
 func (v *PowerView) RefreshInterval() time.Duration { return 5 * time.Minute }
+func (v *PowerView) Hint() string                   { return "r refresh" }
 func (v *PowerView) Bindings() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),

@@ -117,7 +117,7 @@ func (v *FirewallView) Hint() string {
 	if r, ok := v.current(); ok && r.kind == fwRowRule {
 		return "⏎ details · c create rule · D delete · e/d enable/disable · / filter · r refresh"
 	}
-	return "↑/↓ move (cursor on profile refetches its rules) · ⏎ details · / filter · r refresh"
+	return "⏎ details · c create rule · / filter · r refresh"
 }
 
 func (v *FirewallView) Init() tea.Cmd {
@@ -338,19 +338,29 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, v.fetchRules(v.rulesProfile)
 	}
 
-	if v.detailRule != nil || v.detailProfile != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlays own keys only; data/tick messages fall through so
+	// refreshes still land while one is open.
+	if km, ok := msg.(tea.KeyMsg); ok && (v.detailRule != nil || v.detailProfile != nil) {
+		switch km.String() {
+		case "esc", "q":
 			v.detailRule, v.detailProfile = nil, nil
+		case "D", "e", "d":
+			if v.detailRule != nil {
+				rule := *v.detailRule
+				v.detailRule = nil
+				return v, v.ruleAction(km.String(), rule)
+			}
 		}
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		cur, had := v.selection()
 		before := v.filter.Value()
 		if v.filter.Update(msg) {
 			if v.filter.Value() != before {
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
-			return v, nil
+			return v, v.syncRules()
 		}
 	}
 	switch m := msg.(type) {
@@ -370,20 +380,12 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.String() {
 		case "j", "down":
-			rows := v.flatten()
-			if v.cursor < len(rows)-1 {
+			if v.cursor < len(v.flatten())-1 {
 				v.cursor++
-				// When landing on a profile row, refetch rules for it.
-				if r, ok := v.current(); ok && r.kind == fwRowProfile {
-					return v, v.fetchRules(v.filterProfiles()[r.index].Name)
-				}
 			}
 		case "k", "up":
 			if v.cursor > 0 {
 				v.cursor--
-				if r, ok := v.current(); ok && r.kind == fwRowProfile {
-					return v, v.fetchRules(v.filterProfiles()[r.index].Name)
-				}
 			}
 		case "g":
 			v.cursor = 0
@@ -391,11 +393,11 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.flatten())-1, 0)
 		case "/":
 			v.filter.Open()
-			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
+				cur, had := v.selection()
 				v.filter.Clear()
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 		case "r":
 			return v, tea.Batch(v.fetchStatus(), v.fetchProfiles(), v.fetchRules(v.rulesProfile))
@@ -421,7 +423,7 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				return v, nil
 			}
 			v.form.OpenCreate(profile)
-		case "D":
+		case "D", "e", "d":
 			r, ok := v.current()
 			if !ok {
 				return v, nil
@@ -430,65 +432,94 @@ func (v *FirewallView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				v.flash = "select a rule first (current row is a profile)"
 				return v, nil
 			}
-			rule := v.filterRules()[r.index]
-			profile := v.activeProfile()
-			if profile == "" {
-				v.flash = "no profile loaded for this rule list"
-				return v, nil
-			}
-			label := fmt.Sprintf("rule #%d", rule.Order)
-			if rule.Comment != "" {
-				label = rule.Comment
-			}
-			v.confirm.Ask(
-				fmt.Sprintf("fw.delete:%s/%d/%s", profile, rule.RuleID, label),
-				"Delete "+label+"?",
-				"Removing a rule changes how DSM evaluates traffic. There is no undo — recreate from the create form if you change your mind.")
-		case "e":
-			r, ok := v.current()
-			if !ok {
-				return v, nil
-			}
-			if r.kind != fwRowRule {
-				v.flash = "select a rule first (current row is a profile)"
-				return v, nil
-			}
-			rule := v.filterRules()[r.index]
-			profile := v.activeProfile()
-			if profile == "" {
-				v.flash = "no profile loaded for this rule list"
-				return v, nil
-			}
-			label := fmt.Sprintf("rule #%d", rule.Order)
-			if rule.Comment != "" {
-				label = rule.Comment
-			}
-			v.flash = "enabling " + label + "…"
-			return v, v.setEnabledCmd(profile, rule.RuleID, label, true)
-		case "d":
-			r, ok := v.current()
-			if !ok {
-				return v, nil
-			}
-			if r.kind != fwRowRule {
-				v.flash = "select a rule first (current row is a profile)"
-				return v, nil
-			}
-			rule := v.filterRules()[r.index]
-			profile := v.activeProfile()
-			if profile == "" {
-				v.flash = "no profile loaded for this rule list"
-				return v, nil
-			}
-			label := fmt.Sprintf("rule #%d", rule.Order)
-			if rule.Comment != "" {
-				label = rule.Comment
-			}
-			v.flash = "disabling " + label + "…"
-			return v, v.setEnabledCmd(profile, rule.RuleID, label, false)
+			return v, v.ruleAction(m.String(), v.filterRules()[r.index])
 		}
+		return v, v.syncRules()
 	}
 	return v, nil
+}
+
+// ruleAction runs D (delete via confirm) / e / d (enable / disable)
+// against rule in the currently-loaded profile.
+func (v *FirewallView) ruleAction(k string, rule dsm.FirewallRule) tea.Cmd {
+	profile := v.activeProfile()
+	if profile == "" {
+		v.flash = "no profile loaded for this rule list"
+		return nil
+	}
+	label := fmt.Sprintf("rule #%d", rule.Order)
+	if rule.Comment != "" {
+		label = rule.Comment
+	}
+	switch k {
+	case "D":
+		v.confirm.Ask(
+			fmt.Sprintf("fw.delete:%s/%d/%s", profile, rule.RuleID, label),
+			"Delete "+label+"?",
+			"Removing a rule changes how DSM evaluates traffic. There is no undo — recreate from the create form if you change your mind.")
+	case "e":
+		v.flash = "enabling " + label + "…"
+		return v.setEnabledCmd(profile, rule.RuleID, label, true)
+	case "d":
+		v.flash = "disabling " + label + "…"
+		return v.setEnabledCmd(profile, rule.RuleID, label, false)
+	}
+	return nil
+}
+
+// syncRules loads the rules for the profile under the cursor when they
+// aren't the ones on screen, so every cursor jump (j/k, g/G, filter)
+// keeps the rules section in step with the selected profile.
+func (v *FirewallView) syncRules() tea.Cmd {
+	r, ok := v.current()
+	if !ok || r.kind != fwRowProfile {
+		return nil
+	}
+	if name := v.filterProfiles()[r.index].Name; name != v.rulesProfile {
+		return v.fetchRules(name)
+	}
+	return nil
+}
+
+// fwSelection identifies the selected row independent of its index, so
+// the cursor can follow it across filter edits.
+type fwSelection struct {
+	kind    firewallRowKind
+	profile string
+	ruleID  int
+	order   int
+}
+
+func (v *FirewallView) selection() (fwSelection, bool) {
+	r, ok := v.current()
+	if !ok {
+		return fwSelection{}, false
+	}
+	if r.kind == fwRowProfile {
+		return fwSelection{kind: fwRowProfile, profile: v.filterProfiles()[r.index].Name}, true
+	}
+	rule := v.filterRules()[r.index]
+	return fwSelection{kind: fwRowRule, ruleID: rule.RuleID, order: rule.Order}, true
+}
+
+// reselect puts the cursor back on sel after the filter changes,
+// falling back to the first row when it's filtered out.
+func (v *FirewallView) reselect(sel fwSelection, had bool) {
+	v.cursor = 0
+	if !had {
+		return
+	}
+	profs, rules := v.filterProfiles(), v.filterRules()
+	for i, row := range v.flatten() {
+		if row.kind != sel.kind {
+			continue
+		}
+		if row.kind == fwRowProfile && profs[row.index].Name == sel.profile ||
+			row.kind == fwRowRule && rules[row.index].RuleID == sel.ruleID && rules[row.index].Order == sel.order {
+			v.cursor = i
+			return
+		}
+	}
 }
 
 func (v *FirewallView) clampCursor() {
@@ -539,7 +570,7 @@ func (v *FirewallView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
 	for _, p := range profs {
-		parts = append(parts, v.renderProfileRow(p, cursor == idx))
+		parts = append(parts, v.renderProfileRow(p, cursor == idx, width))
 		idx++
 	}
 
@@ -554,7 +585,7 @@ func (v *FirewallView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(no rules)"))
 	}
 	for _, r := range rules {
-		parts = append(parts, v.renderRuleRow(r, cursor == idx))
+		parts = append(parts, v.renderRuleRow(r, cursor == idx, width))
 		idx++
 	}
 
@@ -564,10 +595,7 @@ func (v *FirewallView) Render(width, height int) string {
 	if v.flash != "" {
 		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+v.flash))
 	}
-	if fr := v.filter.Render(t); fr != "" {
-		parts = append(parts, fr)
-	}
-	return fitOrScroll(strings.Join(parts, "\n"), height)
+	return withFilterLine(strings.Join(parts, "\n"), v.filter.Render(t), height)
 }
 
 func (v *FirewallView) renderStatusCard(width int) string {
@@ -610,7 +638,7 @@ func boolChip(t tui.Theme, on bool) string {
 	return t.HealthStyle("disabled").Render(" off ")
 }
 
-func (v *FirewallView) renderProfileRow(p dsm.FirewallProfile, highlight bool) string {
+func (v *FirewallView) renderProfileRow(p dsm.FirewallProfile, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -622,17 +650,21 @@ func (v *FirewallView) renderProfileRow(p dsm.FirewallProfile, highlight bool) s
 	if p.IsDefault.Bool() {
 		defaultTag = mu.Render("default")
 	}
+	descCol := ""
+	if w := flexCol(width, 2+23+13+11+9, 30, 8); w > 0 {
+		descCol = padRight(mu.Render(clipTo(p.Description, w)), w) + " "
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
-		padRight(text.Render(p.Name), 22), " ",
-		padRight(mu.Render(clipTo(p.Description, 30)), 30), " ",
+		padRight(text.Render(clipTo(p.Name, 22)), 22), " ",
+		descCol,
 		padLeft(mu.Render(fmt.Sprintf("%d rules", p.RuleCount)), 12), " ",
 		padRight(defaultTag, 10), " ",
 		active,
 	)
 }
 
-func (v *FirewallView) renderRuleRow(r dsm.FirewallRule, highlight bool) string {
+func (v *FirewallView) renderRuleRow(r dsm.FirewallRule, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -651,13 +683,18 @@ func (v *FirewallView) renderRuleRow(r dsm.FirewallRule, highlight bool) string 
 	if r.Enable.Bool() {
 		enabled = "enabled"
 	}
+	// Source is the flexible column so the enabled state stays visible.
+	srcCol := ""
+	if w := flexCol(width, 2+5+11+9+13+11+9, 22, 6); w > 0 {
+		srcCol = padRight(mu.Render(clipTo(src, w)), w) + " "
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padLeft(mu.Render(fmt.Sprintf("%d", r.Order)), 4), " ",
 		padRight(t.HealthStyle(map[string]string{"accept": "ok", "drop": "stopped"}[strings.ToLower(policy)]).Render(strings.ToUpper(policy)), 10), " ",
 		padRight(text.Render(r.Protocol), 8), " ",
 		padRight(mu.Render(r.PortDst), 12), " ",
-		padRight(mu.Render(clipTo(src, 22)), 22), " ",
+		srcCol,
 		padRight(mu.Render(r.Adapter), 10), " ",
 		t.HealthStyle(enabled).Render(enabled),
 	)

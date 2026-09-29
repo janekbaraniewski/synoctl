@@ -37,8 +37,7 @@ type DriveView struct {
 	files    []dsm.DriveFile
 	filesErr error
 
-	cursor int
-	filter Filter
+	list   listBase
 	loaded bool
 
 	detail *dsm.DriveFile
@@ -51,7 +50,7 @@ func (v *DriveView) Title() string                  { return "Drive" }
 func (v *DriveView) Icon() string                   { return "⌘" }
 func (v *DriveView) RefreshInterval() time.Duration { return 60 * time.Second }
 func (v *DriveView) Bindings() []key.Binding        { return BaseBindings() }
-func (v *DriveView) IsTextEditing() bool            { return v.filter.IsActive() }
+func (v *DriveView) IsTextEditing() bool            { return v.list.filter.IsActive() }
 
 func (v *DriveView) Init() tea.Cmd { return tea.Batch(v.fetchStats(), v.fetchFiles()) }
 
@@ -78,12 +77,12 @@ func (v *DriveView) fetchFiles() tea.Cmd {
 }
 
 func (v *DriveView) filtered() []dsm.DriveFile {
-	if v.filter.Value() == "" {
+	if v.list.FilterValue() == "" {
 		return v.files
 	}
 	out := make([]dsm.DriveFile, 0, len(v.files))
 	for _, f := range v.files {
-		if MatchesAll(v.filter.Value(), f.Name, f.Path, f.Owner, f.Type, f.MimeType) {
+		if MatchesAll(v.list.FilterValue(), f.Name, f.Path, f.Owner, f.Type, f.MimeType) {
 			out = append(out, f)
 		}
 	}
@@ -91,75 +90,45 @@ func (v *DriveView) filtered() []dsm.DriveFile {
 }
 
 func (v *DriveView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
-			v.detail = nil
-		}
-		return v, nil
-	}
-	if v.filter.IsActive() {
-		before := v.filter.Value()
-		if v.filter.Update(msg) {
-			if v.filter.Value() != before {
-				v.cursor = 0
-			}
-			return v, nil
-		}
-	}
 	switch m := msg.(type) {
 	case tui.TickMsg:
 		return v, tea.Batch(v.fetchStats(), v.fetchFiles())
 	case driveStatsMsg:
 		v.stats, v.statsErr = m.S, m.Err
 		v.loaded = true
+		return v, nil
 	case driveFilesMsg:
 		v.files, v.filesErr = m.F, m.Err
 		v.loaded = true
-		v.clampCursor()
-	case tea.KeyMsg:
-		switch m.String() {
-		case "j", "down":
-			rows := v.filtered()
-			if v.cursor < len(rows)-1 {
-				v.cursor++
-			}
-		case "k", "up":
-			if v.cursor > 0 {
-				v.cursor--
-			}
-		case "g":
-			v.cursor = 0
-		case "G":
-			v.cursor = max(len(v.filtered())-1, 0)
-		case "/":
-			v.filter.Open()
-			v.cursor = 0
-		case "esc":
-			if v.filter.Value() != "" {
-				v.filter.Clear()
-				v.cursor = 0
-			}
+		v.list.ClampCursor(len(v.filtered()))
+		return v, nil
+	}
+
+	// Detail overlay swallows keys except esc/q. Data messages above are
+	// still applied so the list is current when the detail closes.
+	if v.detail != nil {
+		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+			v.detail = nil
+		}
+		return v, nil
+	}
+
+	rows := v.filtered()
+	if _, handled := v.list.HandleKey(msg, len(rows)); handled {
+		return v, nil
+	}
+	if km, ok := msg.(tea.KeyMsg); ok {
+		switch km.String() {
 		case "r":
 			return v, tea.Batch(v.fetchStats(), v.fetchFiles())
 		case "enter":
-			rows := v.filtered()
-			if v.cursor >= 0 && v.cursor < len(rows) {
-				f := rows[v.cursor]
+			if c := v.list.Cursor(); c < len(rows) {
+				f := rows[c]
 				v.detail = &f
 			}
 		}
 	}
 	return v, nil
-}
-
-func (v *DriveView) clampCursor() {
-	n := len(v.filtered())
-	if v.cursor >= n {
-		v.cursor = n - 1
-	}
-	if v.cursor < 0 {
-		v.cursor = 0
-	}
 }
 
 func (v *DriveView) Render(width, height int) string {
@@ -188,12 +157,12 @@ func (v *DriveView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(no files)"))
 	}
 	for i, f := range files {
-		parts = append(parts, v.renderRow(f, i == v.cursor))
+		parts = append(parts, v.renderRow(f, i == v.list.Cursor(), width))
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
 		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
-	if fr := v.filter.Render(t); fr != "" {
+	if fr := v.list.FilterFooter(t); fr != "" {
 		parts = append(parts, fr)
 	}
 	return fitOrScroll(strings.Join(parts, "\n"), height)
@@ -229,7 +198,7 @@ func (v *DriveView) renderStatsCard(width int) string {
 	return t.Card(false).Width(width - 2).Render(body)
 }
 
-func (v *DriveView) renderRow(f dsm.DriveFile, highlight bool) string {
+func (v *DriveView) renderRow(f dsm.DriveFile, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -245,10 +214,12 @@ func (v *DriveView) renderRow(f dsm.DriveFile, highlight bool) string {
 	if f.Type != "dir" {
 		size = HumanBytes(uint64(f.Size))
 	}
+	// Shrink the name column on narrow panes so the date stays visible.
+	nameW := max(min(32, width-50), 10)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		icon, " ",
-		padRight(text.Render(clipTo(f.Name, 32)), 32), " ",
+		padRight(text.Render(clipTo(f.Name, nameW)), nameW), " ",
 		padRight(mu.Render(f.Owner), 14), " ",
 		padLeft(mu.Render(size), 10), " ",
 		padRight(mu.Render(modified), 18),

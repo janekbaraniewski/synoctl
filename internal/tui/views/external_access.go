@@ -47,6 +47,7 @@ func (v *ExternalAccessView) Name() string                   { return "external-
 func (v *ExternalAccessView) Title() string                  { return "External Access" }
 func (v *ExternalAccessView) Icon() string                   { return "⇄" }
 func (v *ExternalAccessView) RefreshInterval() time.Duration { return 5 * time.Minute }
+func (v *ExternalAccessView) Hint() string                   { return "r refresh" }
 func (v *ExternalAccessView) Bindings() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),

@@ -35,6 +35,9 @@ func (n *Network) Icon() string                   { return "⇄" }
 func (n *Network) RefreshInterval() time.Duration { return 30 * time.Second }
 func (n *Network) Bindings() []key.Binding        { return BaseBindings() }
 
+// IsTextEditing defers global keys while the inline filter owns input.
+func (n *Network) IsTextEditing() bool { return n.base.filter.IsActive() }
+
 func (n *Network) Init() tea.Cmd { return n.fetch() }
 
 func (n *Network) fetch() tea.Cmd {

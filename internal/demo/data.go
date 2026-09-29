@@ -390,10 +390,10 @@ var demoGroups = []map[string]any{
 // — network —
 
 var demoNetworkInterfaces = []map[string]any{
-	{"id": "eth0", "ifname": "LAN 1", "type": "lan", "ip": "10.24.8.36", "mask": "255.255.255.0", "gateway": "10.24.8.1", "mac": "00:11:32:DE:M0:01", "mtu": 1500, "speed": 2500, "status": "connected", "use_dhcp": true},
-	{"id": "eth1", "ifname": "LAN 2", "type": "lan", "ip": "10.0.0.36", "mask": "255.255.255.0", "gateway": "10.0.0.1", "mac": "00:11:32:DE:M0:02", "mtu": 9000, "speed": 1000, "status": "connected", "use_dhcp": false},
-	{"id": "ovs_bond0", "ifname": "Bond 1", "type": "bond", "ip": "10.24.8.37", "mask": "255.255.255.0", "mac": "00:11:32:DE:M0:03", "mtu": 1500, "speed": 4000, "status": "connected", "use_dhcp": false},
-	{"id": "tailscale0", "ifname": "Tailscale", "type": "vpn", "ip": "100.64.12.34", "mask": "255.255.255.255", "gateway": "100.100.100.100", "mac": "", "mtu": 1280, "speed": 0, "status": "connected", "use_dhcp": false},
+	{"ifname": "eth0", "name": "LAN 1", "type": "lan", "ip": "10.24.8.36", "mask": "255.255.255.0", "gateway": "10.24.8.1", "mac": "00:11:32:DE:M0:01", "mtu": 1500, "speed": 2500, "status": "connected", "use_dhcp": true},
+	{"ifname": "eth1", "name": "LAN 2", "type": "lan", "ip": "10.0.0.36", "mask": "255.255.255.0", "gateway": "10.0.0.1", "mac": "00:11:32:DE:M0:02", "mtu": 9000, "speed": 1000, "status": "connected", "use_dhcp": false},
+	{"ifname": "ovs_bond0", "name": "Bond 1", "type": "bond", "ip": "10.24.8.37", "mask": "255.255.255.0", "mac": "00:11:32:DE:M0:03", "mtu": 1500, "speed": 4000, "status": "connected", "use_dhcp": false},
+	{"ifname": "tailscale0", "name": "Tailscale", "type": "vpn", "ip": "100.64.12.34", "mask": "255.255.255.255", "gateway": "100.100.100.100", "mac": "", "mtu": 1280, "speed": 0, "status": "connected", "use_dhcp": false},
 }
 
 // — logs —
@@ -608,25 +608,25 @@ var demoCatalog = []map[string]any{
 // — services —
 
 var demoServices = []map[string]any{
-	{"service": "nfs-server", "display_name": "NFS", "display_name_section_key": "nfs", "enable_status": "enabled"},
-	{"service": "smb", "display_name": "SMB / CIFS", "display_name_section_key": "smb", "enable_status": "enabled"},
-	{"service": "sftp", "display_name": "sftp", "display_name_section_key": "sftp", "enable_status": "disabled"},
-	{"service": "ssh-shell", "display_name": "ssh-shell", "display_name_section_key": "ssh", "enable_status": "enabled"},
-	{"service": "telnetd", "display_name": "Telnet", "display_name_section_key": "telnet", "enable_status": "disabled"},
-	{"service": "ftp-pure", "display_name": "FTP", "display_name_section_key": "ftp", "enable_status": "disabled"},
-	{"service": "tftp", "display_name": "TFTP", "display_name_section_key": "tftp", "enable_status": "disabled"},
-	{"service": "snmpd", "display_name": "SNMP", "display_name_section_key": "snmp", "enable_status": "always-on"},
-	{"service": "ntpd", "display_name": "NTP", "display_name_section_key": "ntp", "enable_status": "enabled"},
-	{"service": "bonjour", "display_name": "Bonjour mDNS", "display_name_section_key": "bonjour", "enable_status": "disabled"},
-	{"service": "webdav", "display_name": "WebDAV", "display_name_section_key": "webdav", "enable_status": "enabled"},
-	{"service": "upnp", "display_name": "UPnP", "display_name_section_key": "upnp", "enable_status": "enabled"},
-	{"service": "rsyncd", "display_name": "rsyncd", "display_name_section_key": "rsync", "enable_status": "disabled"},
-	{"service": "cupsd", "display_name": "CUPS print daemon", "display_name_section_key": "cups", "enable_status": "always-on"},
-	{"service": "synoscgi", "display_name": "synoscgi", "display_name_section_key": "synoscgi", "enable_status": "always-on"},
-	{"service": "pkg-iscsi", "display_name": "iSCSI", "display_name_section_key": "iscsi", "enable_status": "always-on"},
-	{"service": "ups-net", "display_name": "ups-net", "display_name_section_key": "ups", "enable_status": "disabled"},
-	{"service": "ups-usb", "display_name": "ups-usb", "display_name_section_key": "ups", "enable_status": "always-on"},
-	{"service": "pkg-synosamba-wstransfer-genc", "display_name": "WS-Discovery", "display_name_section_key": "ws", "enable_status": "enabled"},
+	{"service_id": "nfs-server", "display_name": "NFS", "display_name_section_key": "nfs", "enable_status": "enabled"},
+	{"service_id": "smb", "display_name": "SMB / CIFS", "display_name_section_key": "smb", "enable_status": "enabled"},
+	{"service_id": "sftp", "display_name": "sftp", "display_name_section_key": "sftp", "enable_status": "disabled"},
+	{"service_id": "ssh-shell", "display_name": "ssh-shell", "display_name_section_key": "ssh", "enable_status": "enabled"},
+	{"service_id": "telnetd", "display_name": "Telnet", "display_name_section_key": "telnet", "enable_status": "disabled"},
+	{"service_id": "ftp-pure", "display_name": "FTP", "display_name_section_key": "ftp", "enable_status": "disabled"},
+	{"service_id": "tftp", "display_name": "TFTP", "display_name_section_key": "tftp", "enable_status": "disabled"},
+	{"service_id": "snmpd", "display_name": "SNMP", "display_name_section_key": "snmp", "enable_status": "always-on"},
+	{"service_id": "ntpd", "display_name": "NTP", "display_name_section_key": "ntp", "enable_status": "enabled"},
+	{"service_id": "bonjour", "display_name": "Bonjour mDNS", "display_name_section_key": "bonjour", "enable_status": "disabled"},
+	{"service_id": "webdav", "display_name": "WebDAV", "display_name_section_key": "webdav", "enable_status": "enabled"},
+	{"service_id": "upnp", "display_name": "UPnP", "display_name_section_key": "upnp", "enable_status": "enabled"},
+	{"service_id": "rsyncd", "display_name": "rsyncd", "display_name_section_key": "rsync", "enable_status": "disabled"},
+	{"service_id": "cupsd", "display_name": "CUPS print daemon", "display_name_section_key": "cups", "enable_status": "always-on"},
+	{"service_id": "synoscgi", "display_name": "synoscgi", "display_name_section_key": "synoscgi", "enable_status": "always-on"},
+	{"service_id": "pkg-iscsi", "display_name": "iSCSI", "display_name_section_key": "iscsi", "enable_status": "always-on"},
+	{"service_id": "ups-net", "display_name": "ups-net", "display_name_section_key": "ups", "enable_status": "disabled"},
+	{"service_id": "ups-usb", "display_name": "ups-usb", "display_name_section_key": "ups", "enable_status": "always-on"},
+	{"service_id": "pkg-synosamba-wstransfer-genc", "display_name": "WS-Discovery", "display_name_section_key": "ws", "enable_status": "enabled"},
 }
 
 // — containers (Docker) —
@@ -677,10 +677,10 @@ var demoDockerNetworks = []map[string]any{
 // — surveillance —
 
 var demoCameras = []map[string]any{
-	{"id": 1, "name": "Living Room", "model": "Reolink RLC-823A", "vendor": "Reolink", "status": 1, "newName": "Living Room"},
-	{"id": 2, "name": "Garage", "model": "Hikvision DS-2CD2143G2", "vendor": "Hikvision", "status": 1, "newName": "Garage"},
-	{"id": 3, "name": "Front Door", "model": "Reolink Argus 3 Pro", "vendor": "Reolink", "status": 7, "newName": "Front Door"},
-	{"id": 4, "name": "Back Garden", "model": "Reolink RLC-810A", "vendor": "Reolink", "status": 1, "newName": "Back Garden"},
+	{"id": 1, "ip": "10.24.8.61", "port": 554, "enabled": true, "name": "Living Room", "model": "Reolink RLC-823A", "vendor": "Reolink", "status": 1, "newName": "Living Room"},
+	{"id": 2, "ip": "10.24.8.62", "port": 554, "enabled": true, "name": "Garage", "model": "Hikvision DS-2CD2143G2", "vendor": "Hikvision", "status": 1, "newName": "Garage"},
+	{"id": 3, "ip": "10.24.8.63", "port": 554, "enabled": true, "name": "Front Door", "model": "Reolink Argus 3 Pro", "vendor": "Reolink", "status": 7, "newName": "Front Door"},
+	{"id": 4, "ip": "10.24.8.64", "port": 554, "enabled": true, "name": "Back Garden", "model": "Reolink RLC-810A", "vendor": "Reolink", "status": 1, "newName": "Back Garden"},
 }
 
 var demoRecordings = []map[string]any{
@@ -690,30 +690,31 @@ var demoRecordings = []map[string]any{
 }
 
 var demoSurveillanceInfo = map[string]any{
-	"version":       map[string]any{"version": "9.2.5-11979", "build": "11979"},
-	"path":          "/volume2/@surveillance",
-	"hostname":      "demo-ds923",
-	"cameras_total": 4, "cameras_online": 3,
+	"version": "9.2.5", "version_build": "11979",
+	"path":             "/volume2/@surveillance",
+	"hostname":         "demo-ds923",
+	"maxCameraSupport": 8, "cameraNumber": 4, "is_licensed": true, "licenseNumber": 6,
+	"timezone": "Europe/Warsaw",
 }
 
 // — backup —
 
 var demoHyperBackupTasks = []map[string]any{
-	{"task_id": 1, "name": "Daily homes → /volume2/backups", "target": "Synology NAS (local)", "schedule": "daily 03:00", "last_run": time.Now().Add(-90 * time.Minute).Unix(), "last_status": "success", "total_size": 980_412_416_416},
-	{"task_id": 2, "name": "Monthly cold storage → external", "target": "External USB", "schedule": "monthly", "last_run": time.Now().Add(-13 * time.Hour).Unix(), "last_status": "success", "total_size": 4_120_412_416_416},
-	{"task_id": 3, "name": "Photos → B2", "target": "Backblaze B2", "schedule": "weekly Sun 02:00", "last_run": time.Now().Add(-6 * 24 * time.Hour).Unix(), "last_status": "warning", "total_size": 1_265_404_887_040},
+	{"task_id": 1, "name": "Daily homes → /volume2/backups", "repo_target": "local", "repo_path": "/volume2/backups", "schedule": "daily 03:00", "last_run": time.Now().Add(-90 * time.Minute).Unix(), "last_status": "success", "total_size": 980_412_416_416},
+	{"task_id": 2, "name": "Monthly cold storage → external", "repo_target": "usb", "repo_path": "/volumeUSB1/usbshare", "schedule": "monthly", "last_run": time.Now().Add(-13 * time.Hour).Unix(), "last_status": "success", "total_size": 4_120_412_416_416},
+	{"task_id": 3, "name": "Photos → B2", "repo_target": "s3", "repo_path": "b2://demo-photos", "schedule": "weekly Sun 02:00", "last_run": time.Now().Add(-6 * 24 * time.Hour).Unix(), "last_status": "warning", "total_size": 1_265_404_887_040},
 }
 
 var demoActiveBackupTasks = []map[string]any{
-	{"task_id": 11, "name": "workstation-a", "source_type": "device", "target": "/volume2/active-backup", "last_run": time.Now().Add(-22 * time.Hour).Unix(), "status": "success"},
-	{"task_id": 12, "name": "workstation-b", "source_type": "device", "target": "/volume2/active-backup", "last_run": time.Now().Add(-48 * time.Hour).Unix(), "status": "success"},
-	{"task_id": 13, "name": "vm-lab", "source_type": "vm", "target": "/volume2/active-backup", "last_run": time.Now().Add(-10 * 24 * time.Hour).Unix(), "status": "failed"},
+	{"task_id": 11, "task_name": "workstation-a", "device_type": "pc", "device_name": "workstation-a", "repo_path": "/volume2/active-backup", "last_backup_time": time.Now().Add(-22 * time.Hour).Unix(), "next_backup_time": time.Now().Add(2 * time.Hour).Unix(), "last_backup_result": "success", "state": "ready", "status": "success", "enable": true, "used_size": 212_412_416_416, "schedule_str": "daily 23:00"},
+	{"task_id": 12, "task_name": "workstation-b", "device_type": "pc", "device_name": "workstation-b", "repo_path": "/volume2/active-backup", "last_backup_time": time.Now().Add(-48 * time.Hour).Unix(), "next_backup_time": time.Now().Add(3 * time.Hour).Unix(), "last_backup_result": "success", "state": "ready", "status": "success", "enable": true, "used_size": 98_412_416_416, "schedule_str": "daily 23:30"},
+	{"task_id": 13, "task_name": "vm-lab", "device_type": "vmm", "device_name": "vm-lab", "repo_path": "/volume2/active-backup", "last_backup_time": time.Now().Add(-10 * 24 * time.Hour).Unix(), "last_backup_result": "failed", "state": "error", "status": "failed", "enable": true, "used_size": 41_412_416_416, "schedule_str": "weekly Sat 01:00"},
 }
 
 var demoActiveBackupVersions = []map[string]any{
-	{"version_id": 4002, "task_id": 11, "time": time.Now().Add(-22 * time.Hour).Unix(), "size": 1_240_412_416, "status": "complete"},
-	{"version_id": 4001, "task_id": 11, "time": time.Now().Add(-46 * time.Hour).Unix(), "size": 980_412_416, "status": "complete"},
-	{"version_id": 4000, "task_id": 11, "time": time.Now().Add(-72 * time.Hour).Unix(), "size": 1_540_412_416, "status": "complete"},
+	{"version_id": 4002, "task_id": 11, "start_time": time.Now().Add(-22 * time.Hour).Unix(), "end_time": time.Now().Add(-22 * time.Hour).Unix(), "used_size": 1_240_412_416, "status": "complete", "result": "success"},
+	{"version_id": 4001, "task_id": 11, "start_time": time.Now().Add(-46 * time.Hour).Unix(), "end_time": time.Now().Add(-46 * time.Hour).Unix(), "used_size": 980_412_416, "status": "complete", "result": "success"},
+	{"version_id": 4000, "task_id": 11, "start_time": time.Now().Add(-72 * time.Hour).Unix(), "end_time": time.Now().Add(-72 * time.Hour).Unix(), "used_size": 1_540_412_416, "status": "complete", "result": "success"},
 }
 
 // — cloud sync —
@@ -794,10 +795,10 @@ var demoCloudSyncTasks = []map[string]any{
 // — drive —
 
 var demoDriveFiles = []map[string]any{
-	{"name": "Q4-planning.gdoc", "path": "/Drive/Q4-planning.gdoc", "size": 124_280, "type": "document", "modified": time.Now().Add(-6 * time.Hour).Unix(), "owner": "operator"},
-	{"name": "lab-roadmap.gsheet", "path": "/Drive/lab-roadmap.gsheet", "size": 88_412, "type": "spreadsheet", "modified": time.Now().Add(-2 * 24 * time.Hour).Unix(), "owner": "operator"},
-	{"name": "talk-slides.gslides", "path": "/Drive/talk-slides.gslides", "size": 1_412_408, "type": "presentation", "modified": time.Now().Add(-4 * 24 * time.Hour).Unix(), "owner": "operator"},
-	{"name": "video-2026-05-01.mp4", "path": "/Drive/video-2026-05-01.mp4", "size": 482_412_408, "type": "video", "modified": time.Now().Add(-18 * 24 * time.Hour).Unix(), "owner": "demo"},
+	{"file_id": "demo-1", "name": "Q4-planning.gdoc", "path": "/Drive/Q4-planning.gdoc", "size": 124_280, "type": "file", "modified_time": time.Now().Add(-6 * time.Hour).Unix(), "owner": "operator"},
+	{"file_id": "demo-2", "name": "lab-roadmap.gsheet", "path": "/Drive/lab-roadmap.gsheet", "size": 88_412, "type": "file", "modified_time": time.Now().Add(-2 * 24 * time.Hour).Unix(), "owner": "operator"},
+	{"file_id": "demo-3", "name": "talk-slides.gslides", "path": "/Drive/talk-slides.gslides", "size": 1_412_408, "type": "file", "modified_time": time.Now().Add(-4 * 24 * time.Hour).Unix(), "owner": "operator"},
+	{"file_id": "demo-4", "name": "video-2026-05-01.mp4", "path": "/Drive/video-2026-05-01.mp4", "size": 482_412_408, "type": "video", "modified_time": time.Now().Add(-18 * 24 * time.Hour).Unix(), "owner": "demo"},
 }
 
 var demoDriveStats = map[string]any{
@@ -808,13 +809,15 @@ var demoDriveStats = map[string]any{
 
 func cert(id, cn, issuer string, expiresIn time.Duration, isDefault bool) map[string]any {
 	return map[string]any{
-		"id": id, "common_name": cn, "issuer": map[string]any{"common_name": issuer},
-		"subject":          map[string]any{"common_name": cn},
+		"id": id, "desc": cn, "subject_common_name": cn, "issuer_common_name": issuer,
 		"subject_alt_name": []string{cn, "*." + cn},
 		"valid_from":       time.Now().Add(-365 * 24 * time.Hour).Format(time.RFC3339),
 		"valid_till":       time.Now().Add(expiresIn).Format(time.RFC3339),
 		"is_default":       isDefault, "is_broken": false,
-		"services": []string{"system", "webdav"},
+		"services": []map[string]any{
+			{"service_id": "default", "display_name": "System default"},
+			{"service_id": "webdav", "display_name": "WebDAV"},
+		},
 	}
 }
 
@@ -826,17 +829,19 @@ var demoCertificates = []map[string]any{
 }
 
 var demoSecAdvisorConf = map[string]any{
-	"last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix(),
-	"total_items":  6, "critical": 1, "warn": 2, "info": 3,
+	"baseline": "default", "sched_enable": true, "sched_str": "weekly Sun 04:00",
+	"last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix(), "last_scan_result": "warning",
+	"safe_count": 0, "critical_count": 1, "warn_count": 2, "info_count": 3,
+	"notify_mail": true,
 }
 
 var demoSecAdvisorItems = []map[string]any{
-	{"id": "ssh_any", "severity": "critical", "title": "SSH allowed from any IP", "description": "Restrict SSH to LAN or specific subnets to reduce brute-force exposure.", "last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix()},
-	{"id": "auto_block_off", "severity": "warn", "title": "Auto Block disabled", "description": "Enable Auto Block to ban IPs after repeated failed logins.", "last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix()},
-	{"id": "password_policy", "severity": "warn", "title": "Weak password policy", "description": "Increase minimum password length to 12 and require mixed case + digits.", "last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix()},
-	{"id": "ntp_sync", "severity": "info", "title": "NTP healthy", "description": "Time synchronisation is within 1 second of the configured pool.", "last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix()},
-	{"id": "dsm_update", "severity": "info", "title": "DSM up to date", "description": "Running latest DSM 7.2.2-72806 Update 3.", "last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix()},
-	{"id": "2fa_enrolled", "severity": "info", "title": "2-step verification enrolled for admin", "description": "Admin accounts have 2FA enabled.", "last_scanned": time.Now().Add(-3 * 24 * time.Hour).Unix()},
+	{"id": "ssh_any", "category": "network", "severity": "critical", "title": "SSH allowed from any IP", "description": "Restrict SSH to LAN or specific subnets to reduce brute-force exposure.", "last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix()},
+	{"id": "auto_block_off", "category": "account", "severity": "warn", "title": "Auto Block disabled", "description": "Enable Auto Block to ban IPs after repeated failed logins.", "last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix()},
+	{"id": "password_policy", "category": "account", "severity": "warn", "title": "Weak password policy", "description": "Increase minimum password length to 12 and require mixed case + digits.", "last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix()},
+	{"id": "ntp_sync", "category": "system", "severity": "info", "title": "NTP healthy", "description": "Time synchronisation is within 1 second of the configured pool.", "last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix()},
+	{"id": "dsm_update", "category": "system", "severity": "info", "title": "DSM up to date", "description": "Running latest DSM 7.2.2-72806 Update 3.", "last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix()},
+	{"id": "2fa_enrolled", "category": "account", "severity": "info", "title": "2-step verification enrolled for admin", "description": "Admin accounts have 2FA enabled.", "last_scan_time": time.Now().Add(-3 * 24 * time.Hour).Unix()},
 }
 
 var demoSchedTasks = []map[string]any{
@@ -848,23 +853,23 @@ var demoSchedTasks = []map[string]any{
 }
 
 var demoFirewallStatus = map[string]any{
-	"enabled": true, "profile": "Default", "notify_via_dsm_notify": true,
+	"enable": true, "profile_name": "Default", "profile_id": 1, "notify_deny": true, "default_policy": "deny",
 }
 
 var demoFirewallProfiles = []map[string]any{
-	{"name": "Default", "is_default": true, "enabled": true, "rules": 8},
-	{"name": "Strict (away)", "is_default": false, "enabled": false, "rules": 12},
+	{"id": 1, "name": "Default", "is_default": true, "in_use": true, "rule_count": 8},
+	{"id": 2, "name": "Strict (away)", "is_default": false, "in_use": false, "rule_count": 12},
 }
 
 var demoFirewallRules = []map[string]any{
-	{"id": 1, "name": "Allow LAN", "enabled": true, "action": "allow", "protocol": "all", "source": "10.24.8.0/24", "dest_port": "all"},
-	{"id": 2, "name": "Allow Tailscale", "enabled": true, "action": "allow", "protocol": "all", "source": "100.64.0.0/10", "dest_port": "all"},
-	{"id": 3, "name": "Allow HTTPS", "enabled": true, "action": "allow", "protocol": "tcp", "source": "any", "dest_port": "443"},
-	{"id": 4, "name": "Allow HTTP", "enabled": true, "action": "allow", "protocol": "tcp", "source": "any", "dest_port": "80"},
-	{"id": 5, "name": "Allow SSH from LAN only", "enabled": true, "action": "allow", "protocol": "tcp", "source": "10.24.8.0/24", "dest_port": "22"},
-	{"id": 6, "name": "Block country: RU", "enabled": true, "action": "deny", "protocol": "all", "source": "geo:RU", "dest_port": "all"},
-	{"id": 7, "name": "Block country: CN", "enabled": true, "action": "deny", "protocol": "all", "source": "geo:CN", "dest_port": "all"},
-	{"id": 8, "name": "Default deny", "enabled": true, "action": "deny", "protocol": "all", "source": "any", "dest_port": "all"},
+	{"rule_id": 1, "profile_id": 1, "order": 1, "comment": "Allow LAN", "enable": true, "policy": "accept", "protocol": "all", "src_type": "subnet", "src_ip": "10.24.8.0/24", "port_dst": "all"},
+	{"rule_id": 2, "profile_id": 1, "order": 2, "comment": "Allow Tailscale", "enable": true, "policy": "accept", "protocol": "all", "src_type": "subnet", "src_ip": "100.64.0.0/10", "port_dst": "all"},
+	{"rule_id": 3, "profile_id": 1, "order": 3, "comment": "Allow HTTPS", "enable": true, "policy": "accept", "protocol": "tcp", "src_type": "all", "port_dst": "443"},
+	{"rule_id": 4, "profile_id": 1, "order": 4, "comment": "Allow HTTP", "enable": true, "policy": "accept", "protocol": "tcp", "src_type": "all", "port_dst": "80"},
+	{"rule_id": 5, "profile_id": 1, "order": 5, "comment": "Allow SSH from LAN only", "enable": true, "policy": "accept", "protocol": "tcp", "src_type": "subnet", "src_ip": "10.24.8.0/24", "port_dst": "22"},
+	{"rule_id": 6, "profile_id": 1, "order": 6, "comment": "Block country: RU", "enable": true, "policy": "drop", "protocol": "all", "src_type": "geo", "src_geo": []string{"RU"}, "port_dst": "all"},
+	{"rule_id": 7, "profile_id": 1, "order": 7, "comment": "Block country: CN", "enable": true, "policy": "drop", "protocol": "all", "src_type": "geo", "src_geo": []string{"CN"}, "port_dst": "all"},
+	{"rule_id": 8, "profile_id": 1, "order": 8, "comment": "Default deny", "enable": true, "policy": "drop", "protocol": "all", "src_type": "all", "port_dst": "all"},
 }
 
 var demoDDNSProviders = []map[string]any{

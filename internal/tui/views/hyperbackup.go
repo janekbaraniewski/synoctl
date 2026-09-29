@@ -210,17 +210,25 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, v.fetchTasks()
 	}
 
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlay owns keys only; data/tick messages fall through so
+	// refreshes still land while it's open.
+	if km, ok := msg.(tea.KeyMsg); ok && v.detail != nil {
+		switch km.String() {
+		case "esc", "q":
 			v.detail = nil
+		case "X", "p", "R":
+			tk := *v.detail
+			v.detail = nil
+			v.askAction(km.String(), tk)
 		}
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		cur, had := v.currentTask()
 		before := v.filter.Value()
 		if v.filter.Update(msg) {
 			if v.filter.Value() != before {
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 			return v, nil
 		}
@@ -232,6 +240,14 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.tasks, v.tasksErr = m.T, m.Err
 		v.loaded = true
 		v.clampCursor()
+		if v.detail != nil {
+			for _, tk := range v.tasks {
+				if tk.TaskID == v.detail.TaskID {
+					v.detail = &tk
+					break
+				}
+			}
+		}
 	case tea.KeyMsg:
 		switch m.String() {
 		case "j", "down":
@@ -249,11 +265,11 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
-			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
+				cur, had := v.currentTask()
 				v.filter.Clear()
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 		case "r":
 			return v, v.fetchTasks()
@@ -263,30 +279,43 @@ func (v *HyperBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				t := rows[v.cursor]
 				v.detail = &t
 			}
-		case "X":
+		case "X", "p", "R":
 			if tk, ok := v.currentTask(); ok {
-				v.confirm.Ask(
-					fmt.Sprintf("run:%d:%s", tk.TaskID, tk.Name),
-					fmt.Sprintf("Run backup task %s now?", tk.Name),
-					"It may use significant bandwidth and load the repository for the duration of the backup.")
-			}
-		case "p":
-			if tk, ok := v.currentTask(); ok {
-				v.confirm.Ask(
-					fmt.Sprintf("suspend:%d:%s", tk.TaskID, tk.Name),
-					fmt.Sprintf("Suspend backup task %s?", tk.Name),
-					"This pauses the task. It stays paused until you resume it.")
-			}
-		case "R":
-			if tk, ok := v.currentTask(); ok {
-				v.confirm.Ask(
-					fmt.Sprintf("resume:%d:%s", tk.TaskID, tk.Name),
-					fmt.Sprintf("Resume backup task %s?", tk.Name),
-					"The task picks up from where it was suspended.")
+				v.askAction(m.String(), tk)
 			}
 		}
 	}
 	return v, nil
+}
+
+// askAction opens the confirm modal for the X / p / R write keys.
+func (v *HyperBackupView) askAction(k string, tk dsm.BackupTask) {
+	switch k {
+	case "X":
+		v.confirm.Ask(
+			fmt.Sprintf("run:%d:%s", tk.TaskID, tk.Name),
+			fmt.Sprintf("Run backup task %s now?", tk.Name),
+			"It may use significant bandwidth and load the repository for the duration of the backup.")
+	case "p":
+		v.confirm.Ask(
+			fmt.Sprintf("suspend:%d:%s", tk.TaskID, tk.Name),
+			fmt.Sprintf("Suspend backup task %s?", tk.Name),
+			"This pauses the task. It stays paused until you resume it.")
+	case "R":
+		v.confirm.Ask(
+			fmt.Sprintf("resume:%d:%s", tk.TaskID, tk.Name),
+			fmt.Sprintf("Resume backup task %s?", tk.Name),
+			"The task picks up from where it was suspended.")
+	}
+}
+
+// reselect keeps the cursor on the previously selected task after the
+// filter changes, falling back to the first row when it's filtered out.
+func (v *HyperBackupView) reselect(prev dsm.BackupTask, had bool) {
+	v.cursor = 0
+	if had {
+		v.cursor = indexWhere(v.filtered(), func(t dsm.BackupTask) bool { return t.TaskID == prev.TaskID })
+	}
 }
 
 func (v *HyperBackupView) clampCursor() {
@@ -324,7 +353,7 @@ func (v *HyperBackupView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none matching)"))
 	}
 	for i, tk := range tasks {
-		parts = append(parts, v.renderRow(tk, i == v.cursor))
+		parts = append(parts, v.renderRow(tk, i == v.cursor, width))
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
@@ -332,13 +361,10 @@ func (v *HyperBackupView) Render(width, height int) string {
 	if v.flash != "" {
 		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+v.flash))
 	}
-	if fr := v.filter.Render(t); fr != "" {
-		parts = append(parts, fr)
-	}
-	return fitOrScroll(strings.Join(parts, "\n"), height)
+	return withFilterLine(strings.Join(parts, "\n"), v.filter.Render(t), height)
 }
 
-func (v *HyperBackupView) renderRow(tk dsm.BackupTask, highlight bool) string {
+func (v *HyperBackupView) renderRow(tk dsm.BackupTask, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -360,10 +386,16 @@ func (v *HyperBackupView) renderRow(tk dsm.BackupTask, highlight bool) string {
 	if status == "" {
 		status = "—"
 	}
+	// Repo is the flexible column: it shrinks (then drops) so the
+	// status column stays on screen in narrow panes.
+	repoCol := ""
+	if w := flexCol(width, 2+23+19+11+10, 24, 8); w > 0 {
+		repoCol = padRight(mu.Render(clipTo(repo, w)), w) + " "
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
-		padRight(text.Render(tk.Name), 22), " ",
-		padRight(mu.Render(clipTo(repo, 24)), 24), " ",
+		padRight(text.Render(clipTo(tk.Name, 22)), 22), " ",
+		repoCol,
 		padRight(mu.Render(lastRun), 18), " ",
 		padLeft(mu.Render(HumanBytes(uint64(tk.TotalSize))), 10), " ",
 		t.HealthStyle(status).Render(status),

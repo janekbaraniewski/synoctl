@@ -100,6 +100,9 @@ type fileTreeRow struct {
 	Entry  dsm.FSEntry
 	Status string
 	Err    error
+	// Match marks rows that satisfy the active filter themselves (as
+	// opposed to ancestors kept only to show where a match lives).
+	Match bool
 }
 
 func (f *Files) Name() string                   { return "files" }
@@ -261,13 +264,19 @@ func (f *Files) visibleRows() []fileTreeRow {
 
 func (f *Files) rootRows(sh dsm.FileShare, level int, filter string) []fileTreeRow {
 	row := fileTreeRow{Kind: fileTreeRoot, Level: level, Root: sh}
-	childRows := f.childRows(sh.Path, level+1, filter)
 	cells := []string{sh.Name, sh.Path}
 	if meta, ok := f.shareByName(sh.Name); ok {
 		cells = append(cells, meta.Path, meta.Desc)
 	}
 	selfMatch := filter == "" || MatchesAll(filter, cells...)
-	if filter != "" && !selfMatch && len(childRows) == 0 {
+	row.Match = filter != "" && selfMatch
+	if selfMatch {
+		// A matching node keeps its whole subtree so the user can
+		// expand and drill into filtered results.
+		filter = ""
+	}
+	childRows := f.childRows(sh.Path, level+1, filter)
+	if !selfMatch && len(childRows) == 0 {
 		return nil
 	}
 	return append([]fileTreeRow{row}, childRows...)
@@ -275,9 +284,13 @@ func (f *Files) rootRows(sh dsm.FileShare, level int, filter string) []fileTreeR
 
 func (f *Files) entryRows(e dsm.FSEntry, level int, filter string) []fileTreeRow {
 	row := fileTreeRow{Kind: fileTreeEntry, Level: level, Entry: e}
-	childRows := f.childRows(e.Path, level+1, filter)
 	selfMatch := filter == "" || MatchesAll(filter, e.Name, e.Path, e.Type)
-	if filter != "" && !selfMatch && len(childRows) == 0 {
+	row.Match = filter != "" && selfMatch
+	if selfMatch {
+		filter = ""
+	}
+	childRows := f.childRows(e.Path, level+1, filter)
+	if !selfMatch && len(childRows) == 0 {
 		return nil
 	}
 	return append([]fileTreeRow{row}, childRows...)
@@ -305,6 +318,10 @@ func (f *Files) childRows(parent string, level int, filter string) []fileTreeRow
 		return out
 	}
 	for _, child := range children {
+		// A listing that contains its own folder would recurse forever.
+		if child.Path == parent {
+			continue
+		}
 		out = append(out, f.entryRows(child, level, filter)...)
 	}
 	return out
@@ -612,7 +629,11 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return f, nil
 	}
 
+	prevFilter, prevPath := f.base.FilterValue(), f.cursorPath()
 	if _, handled := f.base.HandleKey(msg, f.rowCount()); handled {
+		if f.base.FilterValue() != prevFilter {
+			f.selectPath(prevPath)
+		}
 		return f, f.kickPendingSizes()
 	}
 
@@ -676,6 +697,35 @@ func (f *Files) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		}
 	}
 	return f, nil
+}
+
+// cursorPath returns the path of the row under the cursor ("" if none).
+func (f *Files) cursorPath() string {
+	rows := f.visibleRows()
+	if f.base.Cursor() >= len(rows) {
+		return ""
+	}
+	return rows[f.base.Cursor()].path()
+}
+
+// selectPath runs after the filter changes: it keeps the cursor on p when
+// that row is still visible (and itself matches), otherwise it lands on the
+// first matching row rather than on an ancestor kept only for context.
+func (f *Files) selectPath(p string) {
+	rows := f.visibleRows()
+	filtering := f.base.FilterValue() != ""
+	for i, row := range rows {
+		if p != "" && row.path() == p && (!filtering || row.Match) {
+			f.base.cursor = i
+			return
+		}
+	}
+	for i, row := range rows {
+		if row.Match {
+			f.base.cursor = i
+			return
+		}
+	}
 }
 
 func (f *Files) drillDown() tea.Cmd {
@@ -1054,14 +1104,14 @@ func (f *Files) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
 	for i, row := range rows {
-		parts = append(parts, f.renderTreeRow(row, i == f.base.Cursor()))
+		parts = append(parts, clipTo(f.renderTreeRow(row, i == f.base.Cursor()), width))
 	}
 
 	parts = append(parts, "")
-	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"  ⏎ expand/open · ⌫ collapse · S snapshots · I share details · o open · W download · D delete · N rename · R re-size · / filter"))
+	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(clipTo(
+		"  ⏎ expand/open · ⌫ collapse · S snapshots · I share details · o open · W download · D delete · N rename · R re-size · / filter", width)))
 	if f.flash != "" {
-		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+f.flash))
+		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(clipTo("  "+f.flash, width)))
 	}
 	if v := f.base.FilterFooter(t); v != "" {
 		parts = append(parts, v)

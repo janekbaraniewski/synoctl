@@ -348,7 +348,8 @@ func (a *Apps) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return a, a.fetchServices()
 	}
 
-	// Detail overlay consumes esc/q + per-detail action keys.
+	// Detail overlay consumes esc/q + per-detail action keys. The detail
+	// was opened from the cursor row, so the list actions target it.
 	if a.anyDetailOpen() {
 		if km, ok := msg.(tea.KeyMsg); ok {
 			switch km.String() {
@@ -356,6 +357,7 @@ func (a *Apps) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				a.closeDetail()
 				return a, nil
 			}
+			return a, a.handleAction(km.String())
 		}
 		return a, nil
 	}
@@ -593,7 +595,7 @@ func (a *Apps) renderInstalled(width int) []string {
 		return out
 	}
 	for i, p := range rows {
-		out = append(out, a.renderInstalledRow(p, i == a.base().Cursor()))
+		out = append(out, a.renderInstalledRow(p, i == a.base().Cursor(), width))
 	}
 	return out
 }
@@ -626,7 +628,7 @@ func (a *Apps) renderAvailable(width int) []string {
 		return out
 	}
 	for i, p := range rows {
-		out = append(out, a.renderAvailableRow(p, i == a.base().Cursor()))
+		out = append(out, a.renderAvailableRow(p, i == a.base().Cursor(), width))
 	}
 	return out
 }
@@ -644,12 +646,12 @@ func (a *Apps) renderServices(width int) []string {
 		return out
 	}
 	for i, s := range rows {
-		out = append(out, a.renderServiceRow(s, i == a.base().Cursor()))
+		out = append(out, a.renderServiceRow(s, i == a.base().Cursor(), width))
 	}
 	return out
 }
 
-func (a *Apps) renderInstalledRow(p dsm.Package, highlight bool) string {
+func (a *Apps) renderInstalledRow(p dsm.Package, highlight bool, width int) string {
 	t := a.ctx.Theme
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -661,12 +663,12 @@ func (a *Apps) renderInstalledRow(p dsm.Package, highlight bool) string {
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(p.Name), 28), " ",
 		padRight(muted.Render(p.Version), 18), " ",
-		padRight(muted.Render(p.Maintainer), 24), " ",
+		padRight(muted.Render(p.Maintainer), flexCol(width, 2+29+19+1+10, 24, 6)), " ",
 		t.HealthStyle(status).Render(status),
 	)
 }
 
-func (a *Apps) renderAvailableRow(p dsm.ServerPackage, highlight bool) string {
+func (a *Apps) renderAvailableRow(p dsm.ServerPackage, highlight bool, width int) string {
 	t := a.ctx.Theme
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -694,13 +696,13 @@ func (a *Apps) renderAvailableRow(p dsm.ServerPackage, highlight bool) string {
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(p.DisplayName()), 28), " ",
 		padRight(muted.Render(p.Version), 14), " ",
-		padRight(muted.Render(p.Maintainer), 22), " ",
+		padRight(muted.Render(p.Maintainer), flexCol(width, 2+29+15+1+12+11, 22, 6)), " ",
 		padLeft(muted.Render(size), 10), "  ",
 		beta+t.HealthStyle(state).Render(state),
 	)
 }
 
-func (a *Apps) renderServiceRow(s dsm.Service, highlight bool) string {
+func (a *Apps) renderServiceRow(s dsm.Service, highlight bool, width int) string {
 	t := a.ctx.Theme
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -708,7 +710,7 @@ func (a *Apps) renderServiceRow(s dsm.Service, highlight bool) string {
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(s.ID), 30), " ",
-		padRight(muted.Render(s.DisplayName()), 28), " ",
+		padRight(muted.Render(s.DisplayName()), flexCol(width, 2+31+1+10, 28, 6)), " ",
 		t.HealthStyle(state).Render(state),
 	)
 }

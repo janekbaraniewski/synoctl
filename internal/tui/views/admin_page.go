@@ -27,9 +27,8 @@ type AdminPage struct {
 
 	infoErr, utilErr, usersErr, ifsErr, logsErr error
 
-	cursor int
-	filter Filter
-	flash  string
+	listBase
+	flash string
 
 	detailUser *dsm.User
 	detailIF   *dsm.NetworkInterface
@@ -51,6 +50,9 @@ func (a *AdminPage) Bindings() []key.Binding {
 		key.NewBinding(key.WithKeys("B"), key.WithHelp("B", "reboot (confirm)")),
 		key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "shutdown (confirm)")),
 	)
+}
+func (a *AdminPage) Hint() string {
+	return "↑/↓ move · ⏎ details · / filter · B reboot · S shutdown · r refresh"
 }
 func (a *AdminPage) IsTextEditing() bool { return a.confirm.Open() || a.filter.IsActive() }
 
@@ -177,10 +179,17 @@ func (a *AdminPage) flatten() []adminRow {
 		out = append(out, adminRow{adminRowIF, i})
 	}
 	for i := range a.filterLogs() {
+		if i >= adminMaxLogRows {
+			break
+		}
 		out = append(out, adminRow{adminRowLog, i})
 	}
 	return out
 }
+
+// adminMaxLogRows caps the log section; flatten honours it so the
+// cursor never lands on a row Render doesn't draw.
+const adminMaxLogRows = 12
 
 func (a *AdminPage) current() (adminRow, bool) {
 	rows := a.flatten()
@@ -239,21 +248,15 @@ func (a *AdminPage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return a, nil
 	}
 
-	if a.detailUser != nil || a.detailIF != nil || a.detailLog != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	if km, ok := msg.(tea.KeyMsg); ok && (a.detailUser != nil || a.detailIF != nil || a.detailLog != nil) {
+		if km.String() == "esc" || km.String() == "q" {
 			a.detailUser, a.detailIF, a.detailLog = nil, nil, nil
 		}
 		return a, nil
 	}
 
-	if a.filter.IsActive() {
-		before := a.filter.Value()
-		if a.filter.Update(msg) {
-			if a.filter.Value() != before {
-				a.cursor = 0
-			}
-			return a, nil
-		}
+	if cmd, ok := a.HandleKey(msg, len(a.flatten())); ok {
+		return a, cmd
 	}
 
 	switch m := msg.(type) {
@@ -274,27 +277,6 @@ func (a *AdminPage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		a.clampCursor()
 	case tea.KeyMsg:
 		switch m.String() {
-		case "j", "down":
-			rows := a.flatten()
-			if a.cursor < len(rows)-1 {
-				a.cursor++
-			}
-		case "k", "up":
-			if a.cursor > 0 {
-				a.cursor--
-			}
-		case "g":
-			a.cursor = 0
-		case "G":
-			a.cursor = max(len(a.flatten())-1, 0)
-		case "/":
-			a.filter.Open()
-			a.cursor = 0
-		case "esc":
-			if a.filter.Value() != "" {
-				a.filter.Clear()
-				a.cursor = 0
-			}
 		case "r":
 			return a, tea.Batch(a.fetchInfo(), a.fetchUtil(), a.fetchUsers(), a.fetchNet(), a.fetchLogs())
 		case "enter":
@@ -312,14 +294,21 @@ func (a *AdminPage) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 				}
 			}
 		case "B":
-			a.confirm.Ask("reboot", "Reboot deep-thought?",
+			a.confirm.Ask("reboot", "Reboot "+a.nasName()+"?",
 				"The NAS will be unreachable for a few minutes.")
 		case "S":
-			a.confirm.Ask("shutdown", "Shut down deep-thought?",
+			a.confirm.Ask("shutdown", "Shut down "+a.nasName()+"?",
 				"The NAS will power off. You'll need physical access (or WoL) to bring it back.")
 		}
 	}
 	return a, nil
+}
+
+func (a *AdminPage) nasName() string {
+	if a.info != nil && a.info.Model != "" {
+		return "the " + a.info.Model
+	}
+	return "the NAS"
 }
 
 func (a *AdminPage) clampCursor() {
@@ -357,20 +346,20 @@ func (a *AdminPage) Render(width, height int) string {
 	idx := 0
 
 	parts = append(parts, "", sectionHeader(t, width, "Users", len(users), a.usersErr))
-	if a.users == nil {
+	if a.users == nil && a.usersErr == nil {
 		parts = append(parts, "  "+muted(t, "loading…"))
-	} else if len(users) == 0 {
+	} else if len(users) == 0 && a.usersErr == nil {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
 	for _, u := range users {
-		parts = append(parts, a.renderUserRow(u, cursor == idx))
+		parts = append(parts, a.renderUserRow(width, u, cursor == idx))
 		idx++
 	}
 
 	parts = append(parts, "", sectionHeader(t, width, "Network interfaces", len(ifs), a.ifsErr))
-	if a.ifs == nil {
+	if a.ifs == nil && a.ifsErr == nil {
 		parts = append(parts, "  "+muted(t, "loading…"))
-	} else if len(ifs) == 0 {
+	} else if len(ifs) == 0 && a.ifsErr == nil {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
 	for _, i := range ifs {
@@ -379,17 +368,16 @@ func (a *AdminPage) Render(width, height int) string {
 	}
 
 	parts = append(parts, "", sectionHeader(t, width, "Recent system log", len(logs), a.logsErr))
-	if a.logs == nil {
+	if a.logs == nil && a.logsErr == nil {
 		parts = append(parts, "  "+muted(t, "loading…"))
-	} else if len(logs) == 0 {
+	} else if len(logs) == 0 && a.logsErr == nil {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
-	maxLogRows := 12
 	for li, l := range logs {
-		if li >= maxLogRows {
+		if li >= adminMaxLogRows {
 			break
 		}
-		parts = append(parts, a.renderLogRow(l, cursor == idx))
+		parts = append(parts, a.renderLogRow(width, l, cursor == idx))
 		idx++
 	}
 
@@ -421,7 +409,8 @@ func (a *AdminPage) renderSystemStrip(width int) string {
 		return muted.Render(k+":") + " " + text.Render(v)
 	}
 
-	uptime := HumanDurationFromDSMUptime(a.info.UptimeSeconds).String()
+	up := HumanDurationFromDSMUptime(a.info.UptimeSeconds)
+	uptime := fmt.Sprintf("%dd %02dh", int(up.Hours())/24, int(up.Hours())%24)
 	tempColored := lipgloss.NewStyle().Foreground(tempColor(t, a.info.Temperature)).Bold(true).
 		Render(fmt.Sprintf("%d°C", a.info.Temperature))
 
@@ -451,7 +440,7 @@ func (a *AdminPage) renderSystemStrip(width int) string {
 	return t.Card(false).Width(width - 2).Render(body)
 }
 
-func (a *AdminPage) renderUserRow(u dsm.User, highlight bool) string {
+func (a *AdminPage) renderUserRow(width int, u dsm.User, highlight bool) string {
 	t := a.ctx.Theme
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -459,12 +448,17 @@ func (a *AdminPage) renderUserRow(u dsm.User, highlight bool) string {
 	if status == "" {
 		status = "normal"
 	}
+	// Description and email share what the fixed columns leave, so
+	// the status column stays on screen at narrow widths.
+	avail := max(width-42, 16)
+	descW := min(30, avail/2)
+	emailW := min(28, avail-descW)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(u.Name), 20), " ",
 		padLeft(muted.Render(fmt.Sprintf("uid %d", u.UID)), 8), " ",
-		padRight(muted.Render(u.Description), 30), " ",
-		padRight(muted.Render(u.Email), 28), " ",
+		padRight(muted.Render(u.Description), descW), " ",
+		padRight(muted.Render(u.Email), emailW), " ",
 		t.HealthStyle(status).Render(status),
 	)
 }
@@ -492,7 +486,7 @@ func (a *AdminPage) renderIFRow(i dsm.NetworkInterface, highlight bool) string {
 	)
 }
 
-func (a *AdminPage) renderLogRow(l dsm.LogEntry, highlight bool) string {
+func (a *AdminPage) renderLogRow(width int, l dsm.LogEntry, highlight bool) string {
 	t := a.ctx.Theme
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text)
@@ -514,6 +508,6 @@ func (a *AdminPage) renderLogRow(l dsm.LogEntry, highlight bool) string {
 		caretGlyph(t, highlight), " ",
 		icon, " ",
 		padRight(muted.Render(l.Time), 20), "  ",
-		text.Render(clipTo(event, 60)),
+		text.Render(clipTo(event, min(60, max(width-30, 16)))),
 	)
 }

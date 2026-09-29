@@ -126,6 +126,22 @@ func (e *Explorer) Bindings() []key.Binding {
 	}
 }
 
+// Hint implements tui.Hinter with the keys that apply to the focused pane.
+func (e *Explorer) Hint() string {
+	switch e.focus {
+	case focusMethod, focusVersion:
+		return "⇥/⇧⇥ field · ⌃r invoke · esc back to list"
+	case focusParams:
+		return "⇥/⇧⇥ field · + add · - remove · ←/→ key↔value · ⏎ invoke · esc back to list"
+	case focusResult:
+		return "J/K scroll · ⏎ re-run · ⇥/⇧⇥ field · esc back to params"
+	}
+	if e.selected != nil {
+		return "⏎ select · / filter · J/K scroll result · esc clear selection"
+	}
+	return "⏎ select · / filter"
+}
+
 // ─────────────────────────── fetching ───────────────────────────
 
 type explorerAPIsMsg struct {
@@ -138,6 +154,10 @@ type explorerResultMsg struct {
 	Err  error
 	At   time.Time
 }
+
+// IsTextEditing defers global keys while a call-panel field or the list
+// filter owns input, so typed runes and tab reach the view.
+func (e *Explorer) IsTextEditing() bool { return e.focus != focusList || e.list.filter.IsActive() }
 
 func (e *Explorer) Init() tea.Cmd { return e.fetchAPIs() }
 
@@ -321,8 +341,19 @@ func (e *Explorer) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return e, e.updateParams(km)
 	case focusResult:
 		// `enter` re-runs the call; everything else is consumed silently.
-		if km.Type == tea.KeyEnter {
+		switch km.String() {
+		case "enter":
 			return e, e.invoke()
+		case "j", "down":
+			e.resultScroll++
+		case "k", "up":
+			e.resultScroll = max(e.resultScroll-1, 0)
+		case "pgdown", "ctrl+d":
+			e.resultScroll += 10
+		case "pgup", "ctrl+u":
+			e.resultScroll = max(e.resultScroll-10, 0)
+		case "g", "home":
+			e.resultScroll = 0
 		}
 	}
 	return e, nil
@@ -376,14 +407,24 @@ func (e *Explorer) applyFocus() {
 
 // updateParams handles keypresses while the params editor is focused.
 func (e *Explorer) updateParams(km tea.KeyMsg) tea.Cmd {
+	// `+`/`-` are row commands only while a key field (or nothing) is
+	// focused; value fields take them literally so "-1" or "2024-01-01"
+	// can be typed.
+	onValue := e.paramIdx >= 0 && e.paramIdx < len(e.params) && e.params[e.paramIdx].sub == 1
 	switch km.String() {
 	case "+":
+		if onValue {
+			break
+		}
 		e.params = append(e.params, newParamRow())
 		e.paramIdx = len(e.params) - 1
 		e.params[e.paramIdx].sub = 0
 		e.applyFocus()
 		return nil
 	case "-":
+		if onValue {
+			break
+		}
 		if e.paramIdx >= 0 && e.paramIdx < len(e.params) {
 			e.params = append(e.params[:e.paramIdx], e.params[e.paramIdx+1:]...)
 			if e.paramIdx >= len(e.params) {
@@ -464,12 +505,14 @@ func (e *Explorer) Render(width, height int) string {
 	}
 	rightW := width - leftW
 
-	left := e.renderList(leftW, height-2)
-	right := e.renderRight(rightW, height-2)
+	// Cards add 2 border rows on top of their Height; keep one row
+	// free for the footer so the body + footer fit in `height`.
+	left := e.renderList(leftW, height-3)
+	right := e.renderRight(rightW, height-3)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
-	footer := lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"  ↑/↓ move · ⏎ select / invoke · ⇥ next field · + add param · - remove param · ⌃r invoke · J/K scroll result · / filter · esc back")
+	footer := lipgloss.NewStyle().Foreground(t.Muted).Render(clipTo(
+		"  ↑/↓ move · ⏎ select / invoke · ⇥ next field · + add param · - remove param · ⌃r invoke · J/K scroll result · / filter · esc back", width))
 	if e.flash != "" {
 		color := t.Muted
 		if e.resultErr != nil && e.hasResult {
@@ -479,7 +522,7 @@ func (e *Explorer) Render(width, height int) string {
 		} else if e.pending {
 			color = t.Accent2
 		}
-		footer = lipgloss.NewStyle().Foreground(color).Render("  " + e.flash)
+		footer = lipgloss.NewStyle().Foreground(color).Render(clipTo("  "+e.flash, width))
 	}
 	if fv := e.list.FilterFooter(t); fv != "" {
 		footer = footer + " " + fv
@@ -506,10 +549,11 @@ func (e *Explorer) renderList(width, height int) string {
 		return t.Card(focused).Width(width - 2).Height(height).Render(body)
 	}
 
-	// Visible window — keep the cursor on screen.
-	innerH := height - 4
-	if innerH < 4 {
-		innerH = 4
+	// Visible window — keep the cursor on screen. Each API row is two
+	// lines (name + path) below a one-line title.
+	innerH := (height - 1) / 2
+	if innerH < 2 {
+		innerH = 2
 	}
 	cursor := e.list.Cursor()
 	start := 0
@@ -611,7 +655,7 @@ func (e *Explorer) renderEditor(width int) string {
 
 	// Params section.
 	pHeader := label("params", e.focus == focusParams) + "  " +
-		lipgloss.NewStyle().Foreground(t.Faint).Render("(+ add · - remove · ←/→ key↔value · ⏎ invoke)")
+		lipgloss.NewStyle().Foreground(t.Faint).Render("(on key: + add · - remove · ←/→ key↔value · ⏎ invoke)")
 
 	var paramLines []string
 	if len(e.params) == 0 {
@@ -628,7 +672,7 @@ func (e *Explorer) renderEditor(width int) string {
 			caret := caretGlyph(t, rowFocused)
 			kBox := e.fieldBox(p.key.View(), rowFocused && p.sub == 0, 20)
 			vBox := e.fieldBox(p.value.View(), rowFocused && p.sub == 1, width-38)
-			line := lipgloss.JoinHorizontal(lipgloss.Center,
+			line := lipgloss.JoinHorizontal(lipgloss.Top,
 				caret, " ", kBox, "  =  ", vBox,
 			)
 			paramLines = append(paramLines, line)
@@ -690,8 +734,8 @@ func (e *Explorer) renderResult(width, height int) string {
 	if innerH < 1 {
 		innerH = 1
 	}
-	if e.resultScroll > len(lines)-1 {
-		e.resultScroll = max(len(lines)-1, 0)
+	if e.resultScroll > len(lines)-innerH {
+		e.resultScroll = max(len(lines)-innerH, 0)
 	}
 	if e.resultScroll < 0 {
 		e.resultScroll = 0

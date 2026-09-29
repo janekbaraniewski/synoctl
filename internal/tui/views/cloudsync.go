@@ -88,17 +88,20 @@ func (v *CloudSyncView) filtered() []dsm.CloudSyncTask {
 }
 
 func (v *CloudSyncView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlay owns keys only; data/tick messages fall through so
+	// refreshes still land while it's open.
+	if km, ok := msg.(tea.KeyMsg); ok && v.detail != nil {
+		if km.String() == "esc" || km.String() == "q" {
 			v.detail = nil
 		}
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		cur, had := v.current()
 		before := v.filter.Value()
 		if v.filter.Update(msg) {
 			if v.filter.Value() != before {
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 			return v, nil
 		}
@@ -110,6 +113,7 @@ func (v *CloudSyncView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.tasks, v.tasksErr = m.T, m.Err
 		v.loaded = true
 		v.clampCursor()
+		v.syncDetail()
 	case tea.KeyMsg:
 		switch m.String() {
 		case "j", "down":
@@ -127,23 +131,52 @@ func (v *CloudSyncView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
-			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
+				cur, had := v.current()
 				v.filter.Clear()
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 		case "r":
 			return v, v.fetch()
 		case "enter":
-			rows := v.filtered()
-			if v.cursor >= 0 && v.cursor < len(rows) {
-				t := rows[v.cursor]
-				v.detail = &t
+			if x, ok := v.current(); ok {
+				v.detail = &x
 			}
 		}
 	}
 	return v, nil
+}
+
+// current returns the row under the cursor in the filtered list.
+func (v *CloudSyncView) current() (dsm.CloudSyncTask, bool) {
+	rows := v.filtered()
+	if v.cursor < 0 || v.cursor >= len(rows) {
+		return dsm.CloudSyncTask{}, false
+	}
+	return rows[v.cursor], true
+}
+
+// reselect keeps the cursor on the previously selected row after the
+// filter changes, falling back to the first row when it's filtered out.
+func (v *CloudSyncView) reselect(prev dsm.CloudSyncTask, had bool) {
+	v.cursor = 0
+	if had {
+		v.cursor = indexWhere(v.filtered(), func(x dsm.CloudSyncTask) bool { return x.ID == prev.ID })
+	}
+}
+
+// syncDetail swaps the open detail snapshot for its refreshed copy.
+func (v *CloudSyncView) syncDetail() {
+	if v.detail == nil {
+		return
+	}
+	for _, x := range v.tasks {
+		if x.ID == v.detail.ID {
+			v.detail = &x
+			return
+		}
+	}
 }
 
 func (v *CloudSyncView) clampCursor() {
@@ -178,18 +211,15 @@ func (v *CloudSyncView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none matching)"))
 	}
 	for i, tk := range tasks {
-		parts = append(parts, v.renderRow(tk, i == v.cursor))
+		parts = append(parts, v.renderRow(tk, i == v.cursor, width))
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
 		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
-	if fr := v.filter.Render(t); fr != "" {
-		parts = append(parts, fr)
-	}
-	return fitOrScroll(strings.Join(parts, "\n"), height)
+	return withFilterLine(strings.Join(parts, "\n"), v.filter.Render(t), height)
 }
 
-func (v *CloudSyncView) renderRow(tk dsm.CloudSyncTask, highlight bool) string {
+func (v *CloudSyncView) renderRow(tk dsm.CloudSyncTask, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -207,10 +237,18 @@ func (v *CloudSyncView) renderRow(tk dsm.CloudSyncTask, highlight bool) string {
 	if statusLabel == "" {
 		statusLabel = status
 	}
+	// Label then provider shrink (provider drops first) so the status
+	// column stays on screen in narrow panes.
+	fixed := 2 + 17 + 19 + 11 + 14
+	labelW := max(flexCol(width, fixed, 24, 12), 12)
+	providerCol := ""
+	if w := flexCol(width, fixed+labelW+1, 18, 8); w > 0 {
+		providerCol = padRight(mu.Render(clipTo(provider, w)), w) + " "
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
-		padRight(text.Render(clipTo(tk.Label(), 24)), 24), " ",
-		padRight(mu.Render(clipTo(provider, 18)), 18), " ",
+		padRight(text.Render(clipTo(tk.Label(), labelW)), labelW), " ",
+		providerCol,
 		padRight(mu.Render(direction), 16), " ",
 		padRight(mu.Render(lastSync), 18), " ",
 		padLeft(mu.Render(HumanBytes(uint64(tk.TotalSize))), 10), " ",

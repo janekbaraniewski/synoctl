@@ -112,11 +112,13 @@ func (m *ResourceMonitor) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		case "t":
 			m.window = nextWindow(m.window)
 			m.samples = nil
+			m.loading, m.err = true, nil
 			return m, m.fetch()
 		case "1", "2", "3", "4", "5":
 			if w := windowForKey(t.String()); w != "" && w != m.window {
 				m.window = w
 				m.samples = nil
+				m.loading, m.err = true, nil
 				return m, m.fetch()
 			}
 		}
@@ -202,7 +204,7 @@ func (m *ResourceMonitor) Render(width, height int) string {
 	diskCard := m.metricCard(width, cardH, "Disk I/O",
 		formatPctStats(diskF), diskF, sparkW)
 
-	return joinRows(header, cpuCard, memCard, netCard, diskCard)
+	return fitOrScroll(joinRows(header, cpuCard, memCard, netCard, diskCard), height)
 }
 
 // renderHeader draws the window switcher row inside a card.
@@ -233,7 +235,10 @@ func (m *ResourceMonitor) renderHeader(width int) string {
 	rightW := lipgloss.Width(right) + lipgloss.Width(hint)
 	gapW := width - leftW - rightW - 4
 	if gapW < 1 {
-		gapW = 1
+		// The footer hint already lists these keys; drop the inline
+		// copy rather than wrap the header onto a second line.
+		hint = ""
+		gapW = max(width-leftW-lipgloss.Width(right)-4, 1)
 	}
 	row := title + strings.Repeat(" ", gapW) + right + hint
 	return t.Card(false).Width(width - 2).Render(row)
@@ -251,8 +256,8 @@ func (m *ResourceMonitor) metricCard(width, height int, label, stats string, dat
 
 	body := header + "\n" + spark + "\n" + axis
 	card := t.Card(false).Width(width - 2)
-	if height > 0 {
-		card = card.Height(height - 1)
+	if height > 2 {
+		card = card.Height(height - 2)
 	}
 	return card.Render(body)
 }
@@ -282,8 +287,8 @@ func (m *ResourceMonitor) networkCard(width, height int, rx, tx, total []float64
 		strings.Repeat(" ", 5) + axis
 
 	card := t.Card(false).Width(width - 2)
-	if height > 0 {
-		card = card.Height(height - 1)
+	if height > 2 {
+		card = card.Height(height - 2)
 	}
 	return card.Render(body)
 }

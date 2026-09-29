@@ -27,6 +27,7 @@ type Volumes struct {
 	base         listBase
 	detailVolume *dsm.Volume
 	detailDisk   *dsm.Disk
+	detailScroll int
 }
 
 type storageRowKind int
@@ -50,6 +51,9 @@ func (v *Volumes) Icon() string                   { return "▮" }
 func (v *Volumes) RefreshInterval() time.Duration { return 15 * time.Second }
 func (v *Volumes) Bindings() []key.Binding        { return BaseBindings() }
 func (v *Volumes) Hint() string                   { return "↑/↓ move · ⏎ details · / filter · r refresh" }
+
+// IsTextEditing defers global keys while the inline filter owns input.
+func (v *Volumes) IsTextEditing() bool { return v.base.filter.IsActive() }
 
 func (v *Volumes) Init() tea.Cmd { return v.fetch() }
 
@@ -118,9 +122,23 @@ func (v *Volumes) current() (storageRow, bool) {
 }
 
 func (v *Volumes) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detailVolume != nil || v.detailDisk != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail swallows keys only; data messages still land underneath.
+	if km, ok := msg.(tea.KeyMsg); ok && (v.detailVolume != nil || v.detailDisk != nil) {
+		switch km.String() {
+		case "esc", "q":
 			v.detailVolume, v.detailDisk = nil, nil
+		case "j", "down":
+			v.detailScroll++
+		case "k", "up":
+			v.detailScroll = max(v.detailScroll-1, 0)
+		case "pgdown", "ctrl+d":
+			v.detailScroll += 10
+		case "pgup", "ctrl+u":
+			v.detailScroll = max(v.detailScroll-10, 0)
+		case "home", "g":
+			v.detailScroll = 0
+		case "end", "G":
+			v.detailScroll = 1 << 30
 		}
 		return v, nil
 	}
@@ -143,9 +161,11 @@ func (v *Volumes) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			case storageRowVolume:
 				vol := v.visibleVolumes()[row.index]
 				v.detailVolume = &vol
+				v.detailScroll = 0
 			case storageRowDisk:
 				disk := v.visibleDisks()[row.index]
 				v.detailDisk = &disk
+				v.detailScroll = 0
 			}
 		}
 	}
@@ -160,14 +180,14 @@ func (v *Volumes) Render(width, height int) string {
 			pools = v.storage.StoragePools
 			disks = v.storage.Disks
 		}
-		return renderVolumeDetail(t, width, height, *v.detailVolume, pools, disks, nil)
+		return scrollDetail(renderVolumeDetail(t, width, height, *v.detailVolume, pools, disks, nil), &v.detailScroll, height)
 	}
 	if v.detailDisk != nil {
 		pools := []dsm.StoragePool{}
 		if v.storage != nil {
 			pools = v.storage.StoragePools
 		}
-		return renderDiskDetail(t, width, height, *v.detailDisk, pools)
+		return scrollDetail(renderDiskDetail(t, width, height, *v.detailDisk, pools), &v.detailScroll, height)
 	}
 
 	volumes := v.visibleVolumes()
@@ -182,7 +202,7 @@ func (v *Volumes) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
 	for _, vol := range volumes {
-		parts = append(parts, v.renderVolumeRow(width, vol, idx == cursor))
+		parts = append(parts, clipTo(v.renderVolumeRow(width, vol, idx == cursor), width))
 		idx++
 	}
 
@@ -193,7 +213,7 @@ func (v *Volumes) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none)"))
 	}
 	for _, disk := range disks {
-		parts = append(parts, v.renderDiskRow(width, disk, idx == cursor))
+		parts = append(parts, clipTo(v.renderDiskRow(width, disk, idx == cursor), width))
 		idx++
 	}
 
@@ -204,6 +224,18 @@ func (v *Volumes) Render(width, height int) string {
 		parts = append(parts, f)
 	}
 	return fitOrScroll(strings.Join(parts, "\n"), height)
+}
+
+// scrollDetail windows a tall detail page to height lines starting at
+// *off, clamping *off so over-scrolling can't leave a blank page.
+func scrollDetail(body string, off *int, height int) string {
+	lines := strings.Split(body, "\n")
+	if height <= 0 || len(lines) <= height {
+		*off = 0
+		return body
+	}
+	*off = min(max(*off, 0), len(lines)-height)
+	return strings.Join(lines[*off:*off+height], "\n")
 }
 
 // Inspect renders the cursor'd storage entity in the right-pane inspector.
@@ -294,7 +326,7 @@ func (v *Volumes) renderVolumeRow(width int, vol dsm.Volume, highlight bool) str
 	if total > 0 {
 		ratio = float64(used) / float64(total)
 	}
-	barW := max(width-72, 16)
+	barW := max(width-74, 6)
 	bar := Gauge(t, barW, ratio)
 	status := t.HealthStyle(vol.Status).Render(vol.Status)
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
@@ -322,11 +354,12 @@ func (v *Volumes) renderDiskRow(width int, disk dsm.Disk, highlight bool) string
 	if smart == "" {
 		smart = "-"
 	}
-	_ = width
+	// Shrink the model column first so status stays visible on narrow panes.
+	modelW := min(max(width-63, 12), 28)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(bay), 6), " ",
-		padRight(muted.Render(strings.TrimSpace(disk.Vendor+" "+disk.Model)), 28), " ",
+		padRight(muted.Render(strings.TrimSpace(disk.Vendor+" "+disk.Model)), modelW), " ",
 		padRight(muted.Render(disk.DiskType), 10), " ",
 		padLeft(text.Render(capacity), 10), "  ",
 		temp, "  ",
