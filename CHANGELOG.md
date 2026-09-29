@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.12](https://github.com/janekbaraniewski/synoctl/compare/v0.2.11...v0.2.12) (2026-09-29)
+
+
+### Bug Fixes
+
+* **tui:** repair navigation, filtering and drill-down across views ([#75](https://github.com/janekbaraniewski/synoctl/issues/75)) ([9f1ae47](https://github.com/janekbaraniewski/synoctl/commit/9f1ae47b9d2f36ace5d3052765433b620fbbe877))
+
+
+### Dependencies
+
+* **deps:** bump github.com/dustin/go-humanize from 1.0.1 to 1.1.0 in the go-minor-and-patch group ([#72](https://github.com/janekbaraniewski/synoctl/issues/72)) ([90273ed](https://github.com/janekbaraniewski/synoctl/commit/90273edccd8d6343243dc5f3ee96778e83ca3e7f))
+
 ## [0.2.11](https://github.com/janekbaraniewski/synoctl/compare/v0.2.10...v0.2.11) (2026-09-14)
 
 
