@@ -57,7 +57,7 @@ func (u *Users) Init() tea.Cmd { return u.fetch() }
 // IsTextEditing tells the shell to defer global keybindings while the
 // create / edit / password form or the delete confirmation owns input.
 func (u *Users) IsTextEditing() bool {
-	return u.form.Open() || u.confirm.Open()
+	return u.form.Open() || u.confirm.Open() || u.base.filter.IsActive()
 }
 
 func (u *Users) fetch() tea.Cmd {

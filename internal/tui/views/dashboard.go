@@ -50,6 +50,8 @@ func (d *Dashboard) Bindings() []key.Binding {
 	return []key.Binding{key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh"))}
 }
 
+func (d *Dashboard) Hint() string { return "r refresh" }
+
 // (utilMsg / storageMsg / procsMsg / recentLogsMsg now live in messages.go)
 
 func (d *Dashboard) Init() tea.Cmd {

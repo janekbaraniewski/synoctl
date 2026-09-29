@@ -43,8 +43,7 @@ type SchedTasksView struct {
 	tasks    []dsm.ScheduledTask
 	tasksErr error
 
-	cursor int
-	filter Filter
+	listBase
 	loaded bool
 
 	detail  *dsm.ScheduledTask
@@ -197,20 +196,14 @@ func (v *SchedTasksView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, v.fetch()
 	}
 
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	if km, ok := msg.(tea.KeyMsg); ok && v.detail != nil {
+		if km.String() == "esc" || km.String() == "q" {
 			v.detail = nil
 		}
 		return v, nil
 	}
-	if v.filter.IsActive() {
-		before := v.filter.Value()
-		if v.filter.Update(msg) {
-			if v.filter.Value() != before {
-				v.cursor = 0
-			}
-			return v, nil
-		}
+	if cmd, ok := v.HandleKey(msg, len(v.filtered())); ok {
+		return v, cmd
 	}
 	switch m := msg.(type) {
 	case tui.TickMsg:
@@ -221,27 +214,6 @@ func (v *SchedTasksView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.clampCursor()
 	case tea.KeyMsg:
 		switch m.String() {
-		case "j", "down":
-			rows := v.filtered()
-			if v.cursor < len(rows)-1 {
-				v.cursor++
-			}
-		case "k", "up":
-			if v.cursor > 0 {
-				v.cursor--
-			}
-		case "g":
-			v.cursor = 0
-		case "G":
-			v.cursor = max(len(v.filtered())-1, 0)
-		case "/":
-			v.filter.Open()
-			v.cursor = 0
-		case "esc":
-			if v.filter.Value() != "" {
-				v.filter.Clear()
-				v.cursor = 0
-			}
 		case "r":
 			return v, v.fetch()
 		case "enter":

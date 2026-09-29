@@ -47,7 +47,7 @@ func DefaultKeys() KeyMap {
 		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("PgUp", "page up")),
 		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("PgDn", "page down")),
 		Enter:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "select")),
-		Back:     key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+		Back:     key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back (at top level: sidebar)")),
 		Refresh:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Filter:   key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Palette:  key.NewBinding(key.WithKeys(":"), key.WithHelp(":", "command")),
@@ -58,7 +58,7 @@ func DefaultKeys() KeyMap {
 		NavPrev:     key.NewBinding(key.WithKeys("shift+tab", "["), key.WithHelp("⇧⇥", "prev view")),
 		NavSection:  key.NewBinding(key.WithKeys("}"), key.WithHelp("}", "next section")),
 		NavSectionP: key.NewBinding(key.WithKeys("{"), key.WithHelp("{", "prev section")),
-		NavFocus:    key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("^l", "focus sidebar")),
+		NavFocus:    key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("^l", "focus sidebar / view")),
 
 		Action:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "actions")),
 		ToggleInsp: key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "toggle inspector")),

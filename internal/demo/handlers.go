@@ -3,6 +3,7 @@ package demo
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"net/url"
 	"strconv"
@@ -471,8 +472,13 @@ func (s *Server) handleFileList(_ *Server, form url.Values) any {
 	path := form.Get("folder_path")
 	files, ok := demoFolderContents[path]
 	if !ok {
-		// Default — show a small "looks like nothing's here" listing.
-		files = demoFolderContents["__default__"]
+		// Default — show a small "looks like nothing's here" listing,
+		// re-rooted under the requested folder so paths stay real.
+		for _, f := range demoFolderContents["__default__"] {
+			c := maps.Clone(f)
+			c["path"] = strings.TrimSuffix(path, "/") + "/" + f["name"].(string)
+			files = append(files, c)
+		}
 	}
 	return map[string]any{"files": files, "total": len(files)}
 }
@@ -528,7 +534,8 @@ func (s *Server) handleGroups(_ *Server, _ url.Values) any {
 }
 
 func (s *Server) handleNetwork(_ *Server, _ url.Values) any {
-	return map[string]any{"interfaces": demoNetworkInterfaces}
+	// DSM returns the interface list as a bare array.
+	return demoNetworkInterfaces
 }
 
 func (s *Server) handleLogs(_ *Server, form url.Values) any {
@@ -711,7 +718,7 @@ func (s *Server) handleServices(_ *Server, _ url.Values) any {
 			c[k] = v
 		}
 		// Apply any state mutation from start/enable/disable.
-		if st, ok := s.data.services[svc["service"].(string)]; ok {
+		if st, ok := s.data.services[svc["service_id"].(string)]; ok {
 			c["enable_status"] = st
 		}
 		out = append(out, c)
@@ -749,10 +756,10 @@ func (s *Server) handleHyperBackup(_ *Server, _ url.Values) any {
 	return map[string]any{"task_list": demoHyperBackupTasks, "total": len(demoHyperBackupTasks)}
 }
 func (s *Server) handleActiveBackup(_ *Server, _ url.Values) any {
-	return map[string]any{"task_list": demoActiveBackupTasks, "total": len(demoActiveBackupTasks)}
+	return map[string]any{"tasks": demoActiveBackupTasks, "total": len(demoActiveBackupTasks)}
 }
 func (s *Server) handleActiveBackupVersions(_ *Server, _ url.Values) any {
-	return map[string]any{"version_list": demoActiveBackupVersions, "total": len(demoActiveBackupVersions)}
+	return map[string]any{"versions": demoActiveBackupVersions, "total": len(demoActiveBackupVersions)}
 }
 func (s *Server) handleCloudSync(_ *Server, _ url.Values) any {
 	return map[string]any{"connections": demoCloudSyncTasks, "total": len(demoCloudSyncTasks)}

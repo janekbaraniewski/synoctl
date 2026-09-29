@@ -53,8 +53,8 @@ func (f *Filter) Update(msg tea.Msg) bool {
 		f.value = ""
 		return true
 	case tea.KeyBackspace:
-		if len(f.value) > 0 {
-			f.value = f.value[:len(f.value)-1]
+		if r := []rune(f.value); len(r) > 0 {
+			f.value = string(r[:len(r)-1])
 		}
 		return true
 	case tea.KeyRunes, tea.KeySpace:

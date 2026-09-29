@@ -100,6 +100,9 @@ func (v *VMMView) Hint() string {
 	return ""
 }
 
+// IsTextEditing defers global keys while the inline filter owns input.
+func (v *VMMView) IsTextEditing() bool { return v.base().filter.IsActive() }
+
 func (v *VMMView) Init() tea.Cmd {
 	return tea.Batch(v.fetchVMs(), v.fetchHosts())
 }
@@ -166,14 +169,6 @@ func (v *VMMView) visibleCount() int {
 }
 
 func (v *VMMView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	// Detail overlay swallows everything except esc/q.
-	if v.detailVM != nil || v.detailHost != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
-			v.detailVM, v.detailHost = nil, nil
-		}
-		return v, nil
-	}
-
 	switch m := msg.(type) {
 	case tui.TickMsg:
 		return v, tea.Batch(v.fetchVMs(), v.fetchHosts())
@@ -186,6 +181,15 @@ func (v *VMMView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.hosts, v.hostErr = m.H, m.Err
 		v.loaded[vmmModeHosts] = true
 		v.bases[vmmModeHosts].ClampCursor(len(v.visibleHosts()))
+		return v, nil
+	}
+
+	// Detail overlay swallows keys except esc/q. Data messages above are
+	// still applied so the list is current when the detail closes.
+	if v.detailVM != nil || v.detailHost != nil {
+		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+			v.detailVM, v.detailHost = nil, nil
+		}
 		return v, nil
 	}
 
@@ -304,7 +308,7 @@ func (v *VMMView) renderVMs(width int) []string {
 	}
 	cursor := v.bases[vmmModeVMs].Cursor()
 	for i, g := range rows {
-		out = append(out, v.renderVMRow(g, i == cursor))
+		out = append(out, v.renderVMRow(g, i == cursor, width))
 	}
 	return out
 }
@@ -323,12 +327,12 @@ func (v *VMMView) renderHosts(width int) []string {
 	}
 	cursor := v.bases[vmmModeHosts].Cursor()
 	for i, h := range rows {
-		out = append(out, v.renderHostRow(h, i == cursor))
+		out = append(out, v.renderHostRow(h, i == cursor, width))
 	}
 	return out
 }
 
-func (v *VMMView) renderVMRow(g dsm.VirtualMachine, highlight bool) string {
+func (v *VMMView) renderVMRow(g dsm.VirtualMachine, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -351,9 +355,11 @@ func (v *VMMView) renderVMRow(g dsm.VirtualMachine, highlight bool) string {
 	if flags == "" {
 		flags = "—"
 	}
+	// Shrink the name column on narrow panes so the status stays visible.
+	nameW := max(min(24, width-59), 10)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
-		padRight(text.Render(clipTo(g.Name, 24)), 24), " ",
+		padRight(text.Render(clipTo(g.Name, nameW)), nameW), " ",
 		padRight(mu.Render(clipTo(cpuMem, 22)), 22), " ",
 		padRight(mu.Render(clipTo(host, 14)), 14), " ",
 		padRight(mu.Render(flags), 8), " ",
@@ -361,7 +367,7 @@ func (v *VMMView) renderVMRow(g dsm.VirtualMachine, highlight bool) string {
 	)
 }
 
-func (v *VMMView) renderHostRow(h dsm.VMHost, highlight bool) string {
+func (v *VMMView) renderHostRow(h dsm.VMHost, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -373,9 +379,10 @@ func (v *VMMView) renderHostRow(h dsm.VMHost, highlight bool) string {
 		HumanBytes(uint64(h.RAMUsed)*1024*1024),
 		HumanBytes(uint64(h.RAMTotal)*1024*1024))
 	cpu := fmt.Sprintf("%.1f%%", h.CPUUsage)
+	nameW := max(min(22, width-67), 10)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
-		padRight(text.Render(clipTo(h.Name, 22)), 22), " ",
+		padRight(text.Render(clipTo(h.Name, nameW)), nameW), " ",
 		padRight(mu.Render(clipTo(h.HostIP, 18)), 18), " ",
 		padLeft(mu.Render(cpu), 7), " ",
 		padRight(mu.Render(ram), 22), " ",

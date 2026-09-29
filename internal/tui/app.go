@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janbaraniewski/synology-ctl/internal/dsm"
 )
@@ -37,6 +38,12 @@ type App struct {
 	// Layout state.
 	sidebarHidden bool
 	inspectorOff  bool // user toggled inspector off explicitly
+	sideFocus     bool // sidebar owns j/k/enter instead of the view
+
+	// Screen geometry from the last render, for mouse hit-testing.
+	sideRows []int // sidebar line → flat index (-1 for non-view lines)
+	sideW    int
+	mainW    int
 
 	// Modal state.
 	paletteOpen bool
@@ -164,6 +171,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmd, resched)
 
+	case tea.MouseMsg:
+		return a.updateMouse(m)
+
 	case tea.KeyMsg:
 		// Modal modes consume keys first.
 		if a.paletteOpen {
@@ -198,6 +208,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, cmd
 		}
 
+		if a.sideFocus {
+			if handled, cmd := a.updateSidebar(m); handled {
+				return a, cmd
+			}
+		}
+
 		// Global key bindings.
 		switch {
 		case key.Matches(m, a.keys.Quit):
@@ -227,7 +243,31 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case key.Matches(m, a.keys.ToggleSide):
 			a.sidebarHidden = !a.sidebarHidden
+			if a.sidebarHidden {
+				a.sideFocus = false
+			}
 			return a, nil
+		case key.Matches(m, a.keys.NavFocus):
+			a.sideFocus = !a.sideFocus && !a.sidebarHidden
+			return a, nil
+		case key.Matches(m, a.keys.Back) && !a.sidebarHidden:
+			// Esc walks back up: the view closes whatever it has open
+			// (detail, filter, drill-down). When it had nothing left to
+			// close, focus moves to the sidebar.
+			// chisle: "nothing changed" is detected by comparing renders,
+			// an explicit AtRoot() per view would be exact but touches 40 views.
+			v := a.activeView()
+			if v == nil {
+				return a, nil
+			}
+			before := v.Render(a.mainW, a.height)
+			nv, cmd := v.Update(msg)
+			a.flat[a.active].view = nv
+			a.byName[nv.Name()] = a.active
+			if cmd == nil && nv.Render(a.mainW, a.height) == before {
+				a.sideFocus = true
+			}
+			return a, cmd
 		case key.Matches(m, a.keys.Action):
 			if act, ok := a.activeView().(Actor); ok {
 				a.actions.Open(a.activeView().Title()+" — actions", act.Actions())
@@ -236,15 +276,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Forward everything else to the active view.
-	v := a.activeView()
-	if v == nil {
-		return a, nil
+	// Forward everything else to the active view. A key the sidebar
+	// didn't handle (e.g. '/') acts on the view, so focus follows it.
+	if _, ok := msg.(tea.KeyMsg); ok {
+		a.sideFocus = false
 	}
-	nv, cmd := v.Update(msg)
-	a.flat[a.active].view = nv
-	a.byName[nv.Name()] = a.active
-	return a, cmd
+	return a.forward(msg)
 }
 
 // routeActionResult turns the cmd returned by the action menu into a cmd
@@ -409,6 +446,7 @@ func (a *App) renderBody(width, height int) string {
 	if mainW < 20 {
 		mainW = 20
 	}
+	a.sideW, a.mainW = sideW, mainW
 
 	side := ""
 	if sideW > 0 {
@@ -416,12 +454,12 @@ func (a *App) renderBody(width, height int) string {
 	}
 	mainOut := ""
 	if v := a.activeView(); v != nil {
-		mainOut = fitToHeight(v.Render(mainW, height), height)
+		mainOut = fitBox(v.Render(mainW, height), mainW, height)
 	}
 	inspOut := ""
 	if inspW > 0 {
 		if insp, ok := a.activeView().(Inspector); ok {
-			inspOut = fitToHeight(a.renderInspectorPane(insp, inspW, height), height)
+			inspOut = fitBox(a.renderInspectorPane(insp, inspW, height), inspW, height)
 		}
 	}
 
@@ -478,17 +516,26 @@ func (a *App) renderSidebar(width, height int) string {
 	itemActive := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 	itemIdle := lipgloss.NewStyle().Foreground(t.Text)
 
+	if a.sideFocus {
+		headerStyle = headerStyle.Underline(true)
+		itemActive = itemActive.Reverse(true)
+	}
+
 	var lines []string
+	var rows []int // parallel to lines: flat index, or -1
 	activeLine := -1
 	lines = append(lines, "") // breathing room from top bar
+	rows = append(rows, -1)
 
 	for i, it := range a.flat {
 		if it.isHeader {
 			if len(lines) > 1 {
 				lines = append(lines, "") // gap between sections
+				rows = append(rows, -1)
 			}
 			label := " " + strings.ToUpper(it.header)
 			lines = append(lines, headerStyle.Render(clipFitLeft(label, width)))
+			rows = append(rows, -1)
 			continue
 		}
 		active := i == a.active
@@ -509,6 +556,7 @@ func (a *App) renderSidebar(width, height int) string {
 			row = ansiClipLeft(row, width)
 		}
 		lines = append(lines, row)
+		rows = append(rows, i)
 		if active {
 			activeLine = len(lines) - 1
 		}
@@ -516,37 +564,51 @@ func (a *App) renderSidebar(width, height int) string {
 
 	// Footer: tiny legend so first-timers know what the marker means.
 	if len(lines) > height {
-		lines = windowLines(lines, height, activeLine)
+		start := windowStart(len(lines), height, activeLine)
+		lines = lines[start : start+height]
+		rows = rows[start : start+height]
 	}
+	a.sideRows = rows
 	if len(lines) < height-2 {
 		for len(lines) < height-2 {
 			lines = append(lines, "")
 		}
-		lines = append(lines, faint.Render(clipFitLeft("  tab · view  } · sect", width)))
+		lines = append(lines, faint.Render(clipFitLeft("  esc · sidebar  ⇥ · next", width)))
 		lines = append(lines, muted.Render(clipFitLeft("  : · cmd  ? · help", width)))
 	}
 	out := strings.Join(lines, "\n")
 	return fitToHeight(out, height)
 }
 
-func windowLines(lines []string, n, focus int) []string {
-	if n <= 0 {
-		return nil
-	}
-	if len(lines) <= n {
-		return lines
-	}
-	if focus < 0 {
-		return lines[:n]
+// windowStart returns the first line of an n-line window over total
+// lines that keeps focus roughly centred.
+func windowStart(total, n, focus int) int {
+	if focus < 0 || total <= n {
+		return 0
 	}
 	start := focus - n/2
 	if start < 0 {
 		start = 0
 	}
-	if start+n > len(lines) {
-		start = len(lines) - n
+	if start+n > total {
+		start = total - n
 	}
-	return lines[start : start+n]
+	return start
+}
+
+// fitBox forces s to exactly w×h cells: long lines are truncated
+// (ANSI-aware) so one overflowing view line can't shove the columns to
+// its right off screen, short ones are padded.
+func fitBox(s string, w, h int) string {
+	lines := strings.Split(fitToHeight(s, h), "\n")
+	for i, l := range lines {
+		if lw := lipgloss.Width(l); lw > w {
+			lines[i] = ansi.Truncate(l, w, "")
+		} else if lw < w {
+			lines[i] = l + strings.Repeat(" ", w-lw)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // fitToHeight pads with blank lines or truncates so the rendered body is
@@ -644,19 +706,21 @@ func (a *App) renderHintBar() string {
 	// implements the Hinter interface. Falls back to a generic line
 	// when the view didn't bother (so we never show a *wrong* hint).
 	left := " "
-	if h, ok := a.activeView().(Hinter); ok {
+	if a.sideFocus {
+		left = " " + chip("↑↓", "switch view") + chip("⏎/esc", "back to view")
+	} else if h, ok := a.activeView().(Hinter); ok {
 		if s := strings.TrimSpace(h.Hint()); s != "" {
 			left = " " + muted.Render(s)
 		}
 	}
 	if strings.TrimSpace(left) == "" {
-		left = " " + chip("⏎", "select") + chip("/", "filter") + chip("r", "refresh")
+		left = " " + chip("r", "refresh")
 	}
 
 	// Right half — globals that work everywhere. ⇥ navigates the
 	// sidebar; } jumps sections; : opens the palette; ? shows help;
 	// q quits.
-	right := chip("⇥", "nav") + chip(":", "cmd") + chip("?", "help") + chip("q", "quit") + " "
+	right := chip("esc", "back") + chip("⇥", "next view") + chip(":", "cmd") + chip("?", "help") + chip("q", "quit") + " "
 
 	gap := a.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 0 {
@@ -692,7 +756,7 @@ func (a *App) renderHelpOverlay() string {
 	}
 	global := []key.Binding{
 		a.keys.Help, a.keys.Quit, a.keys.Palette, a.keys.Filter, a.keys.Refresh,
-		a.keys.NavNext, a.keys.NavPrev, a.keys.NavSection, a.keys.NavSectionP,
+		a.keys.NavNext, a.keys.NavPrev, a.keys.NavSection, a.keys.NavSectionP, a.keys.NavFocus,
 		a.keys.Action, a.keys.ToggleInsp, a.keys.ToggleSide, a.keys.YankPath,
 		a.keys.Up, a.keys.Down, a.keys.Top, a.keys.Bottom, a.keys.PageUp, a.keys.PageDown,
 		a.keys.Enter, a.keys.Back,
@@ -796,6 +860,89 @@ func jumpSection(items []flatItem, from, delta int) int {
 		next = 0
 	}
 	return bounds[next].idx
+}
+
+// updateSidebar handles keys while the sidebar has focus. Moving the
+// cursor switches the view immediately so the main pane previews it.
+func (a *App) updateSidebar(m tea.KeyMsg) (bool, tea.Cmd) {
+	switch {
+	case key.Matches(m, a.keys.Down):
+		a.active = stepView(a.flat, a.active, +1)
+		return true, a.activate()
+	case key.Matches(m, a.keys.Up):
+		a.active = stepView(a.flat, a.active, -1)
+		return true, a.activate()
+	case key.Matches(m, a.keys.Top):
+		a.active = firstViewIndex(a.flat)
+		return true, a.activate()
+	case key.Matches(m, a.keys.Bottom):
+		a.active = stepView(a.flat, 0, -1)
+		return true, a.activate()
+	case key.Matches(m, a.keys.Enter, a.keys.Right, a.keys.Back):
+		a.sideFocus = false
+		return true, nil
+	}
+	return false, nil
+}
+
+// updateMouse maps clicks on the sidebar to view switches and wheel
+// scrolling over the main pane to ↑/↓ so every list scrolls.
+func (a *App) updateMouse(m tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if a.paletteOpen || a.helpOpen || a.actions.IsOpen() {
+		return a, nil
+	}
+	inSide := a.sideW > 0 && m.X < a.sideW
+	switch m.Button {
+	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
+		if m.Action != tea.MouseActionPress {
+			return a, nil
+		}
+		up := m.Button == tea.MouseButtonWheelUp
+		if inSide {
+			if up {
+				a.active = stepView(a.flat, a.active, -1)
+			} else {
+				a.active = stepView(a.flat, a.active, +1)
+			}
+			return a, a.activate()
+		}
+		if te, ok := a.activeView().(TextEditing); ok && te.IsTextEditing() {
+			return a, nil
+		}
+		k := tea.KeyMsg{Type: tea.KeyDown}
+		if up {
+			k = tea.KeyMsg{Type: tea.KeyUp}
+		}
+		a.sideFocus = false
+		return a.forward(k)
+	case tea.MouseButtonLeft:
+		if m.Action != tea.MouseActionRelease {
+			return a, nil
+		}
+		row := m.Y - 1 // body starts under the top bar
+		if inSide {
+			if row >= 0 && row < len(a.sideRows) && a.sideRows[row] >= 0 {
+				a.active = a.sideRows[row]
+				a.sideFocus = false
+				return a, a.activate()
+			}
+			return a, nil
+		}
+		a.sideFocus = false
+	}
+	return a, nil
+}
+
+// forward delivers msg to the active view.
+func (a *App) forward(msg tea.Msg) (tea.Model, tea.Cmd) {
+	v := a.activeView()
+	if v == nil {
+		return a, nil
+	}
+	nv, cmd := v.Update(msg)
+	a.flat[a.active].view = nv
+	a.byName[nv.Name()] = a.active
+	return a, cmd
 }
 
 // clipFitLeft truncates with ellipsis or right-pads a left-aligned label.

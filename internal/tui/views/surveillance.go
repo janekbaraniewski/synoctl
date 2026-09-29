@@ -35,8 +35,7 @@ type SurveillanceView struct {
 
 	camsErr, infoErr error
 
-	cursor int
-	filter Filter
+	list   listBase
 	loaded bool
 
 	detail *dsm.Camera
@@ -49,7 +48,7 @@ func (v *SurveillanceView) Title() string                  { return "Cameras" }
 func (v *SurveillanceView) Icon() string                   { return "◉" }
 func (v *SurveillanceView) RefreshInterval() time.Duration { return 30 * time.Second }
 func (v *SurveillanceView) Bindings() []key.Binding        { return BaseBindings() }
-func (v *SurveillanceView) IsTextEditing() bool            { return v.filter.IsActive() }
+func (v *SurveillanceView) IsTextEditing() bool            { return v.list.filter.IsActive() }
 
 func (v *SurveillanceView) Init() tea.Cmd {
 	return tea.Batch(v.fetchCams(), v.fetchInfo())
@@ -77,12 +76,12 @@ func (v *SurveillanceView) fetchInfo() tea.Cmd {
 }
 
 func (v *SurveillanceView) filtered() []dsm.Camera {
-	if v.filter.Value() == "" {
+	if v.list.FilterValue() == "" {
 		return v.cams
 	}
 	out := make([]dsm.Camera, 0, len(v.cams))
 	for _, c := range v.cams {
-		if MatchesAll(v.filter.Value(), c.Name, c.Model, c.Vendor, c.IP, c.Resolution, c.Group) {
+		if MatchesAll(v.list.FilterValue(), c.Name, c.Model, c.Vendor, c.IP, c.Resolution, c.Group) {
 			out = append(out, c)
 		}
 	}
@@ -90,74 +89,44 @@ func (v *SurveillanceView) filtered() []dsm.Camera {
 }
 
 func (v *SurveillanceView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
-			v.detail = nil
-		}
-		return v, nil
-	}
-	if v.filter.IsActive() {
-		before := v.filter.Value()
-		if v.filter.Update(msg) {
-			if v.filter.Value() != before {
-				v.cursor = 0
-			}
-			return v, nil
-		}
-	}
 	switch m := msg.(type) {
 	case tui.TickMsg:
 		return v, tea.Batch(v.fetchCams(), v.fetchInfo())
 	case camerasMsg:
 		v.cams, v.camsErr = m.C, m.Err
 		v.loaded = true
-		v.clampCursor()
+		v.list.ClampCursor(len(v.filtered()))
+		return v, nil
 	case surveillanceInfoMsg:
 		v.info, v.infoErr = m.I, m.Err
-	case tea.KeyMsg:
-		switch m.String() {
-		case "j", "down":
-			rows := v.filtered()
-			if v.cursor < len(rows)-1 {
-				v.cursor++
-			}
-		case "k", "up":
-			if v.cursor > 0 {
-				v.cursor--
-			}
-		case "g":
-			v.cursor = 0
-		case "G":
-			v.cursor = max(len(v.filtered())-1, 0)
-		case "/":
-			v.filter.Open()
-			v.cursor = 0
-		case "esc":
-			if v.filter.Value() != "" {
-				v.filter.Clear()
-				v.cursor = 0
-			}
+		return v, nil
+	}
+
+	// Detail overlay swallows keys except esc/q. Data messages above are
+	// still applied so the list is current when the detail closes.
+	if v.detail != nil {
+		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+			v.detail = nil
+		}
+		return v, nil
+	}
+
+	rows := v.filtered()
+	if _, handled := v.list.HandleKey(msg, len(rows)); handled {
+		return v, nil
+	}
+	if km, ok := msg.(tea.KeyMsg); ok {
+		switch km.String() {
 		case "r":
 			return v, tea.Batch(v.fetchCams(), v.fetchInfo())
 		case "enter":
-			rows := v.filtered()
-			if v.cursor >= 0 && v.cursor < len(rows) {
-				c := rows[v.cursor]
+			if c := v.list.Cursor(); c < len(rows) {
+				c := rows[c]
 				v.detail = &c
 			}
 		}
 	}
 	return v, nil
-}
-
-func (v *SurveillanceView) clampCursor() {
-	n := len(v.filtered())
-	if v.cursor >= n {
-		v.cursor = n - 1
-	}
-	if v.cursor < 0 {
-		v.cursor = 0
-	}
 }
 
 func (v *SurveillanceView) Render(width, height int) string {
@@ -188,13 +157,13 @@ func (v *SurveillanceView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none matching)"))
 	}
 	for i, c := range cams {
-		parts = append(parts, v.renderRow(c, i == v.cursor))
+		parts = append(parts, v.renderRow(c, i == v.list.Cursor(), width))
 	}
 
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
 		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
-	if fr := v.filter.Render(t); fr != "" {
+	if fr := v.list.FilterFooter(t); fr != "" {
 		parts = append(parts, fr)
 	}
 	return fitOrScroll(strings.Join(parts, "\n"), height)
@@ -237,16 +206,22 @@ func camStatusLabel(c dsm.Camera) string {
 	}
 }
 
-func (v *SurveillanceView) renderRow(c dsm.Camera, highlight bool) string {
+func (v *SurveillanceView) renderRow(c dsm.Camera, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
 	status := camStatusLabel(c)
+	// Some firmwares already prefix the model with the vendor.
+	model := c.Model
+	if !strings.HasPrefix(strings.ToLower(model), strings.ToLower(c.Vendor)) {
+		model = strings.TrimSpace(c.Vendor + " " + model)
+	}
+	modelW := flexCol(width, 2+5+23+17+13, 28, 6)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padLeft(mu.Render(fmt.Sprintf("%d", c.ID)), 4), " ",
-		padRight(text.Render(c.Name), 22), " ",
-		padRight(mu.Render(clipTo(strings.TrimSpace(c.Vendor+" "+c.Model), 28)), 28), " ",
+		padRight(text.Render(clipTo(c.Name, 22)), 22), " ",
+		padRight(mu.Render(clipTo(model, modelW)), modelW), " ",
 		padRight(mu.Render(c.IP), 16), " ",
 		t.HealthStyle(status).Render(status),
 	)

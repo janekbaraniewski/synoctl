@@ -37,8 +37,7 @@ type QuotasView struct {
 	users     []dsm.UserQuota
 	usersErr  error
 
-	cursor int
-	filter Filter
+	base   listBase
 	loaded bool
 
 	detailShare *dsm.ShareQuota
@@ -53,7 +52,7 @@ func (v *QuotasView) Title() string                  { return "Quotas" }
 func (v *QuotasView) Icon() string                   { return "⊞" }
 func (v *QuotasView) RefreshInterval() time.Duration { return 2 * time.Minute }
 func (v *QuotasView) Bindings() []key.Binding        { return BaseBindings() }
-func (v *QuotasView) IsTextEditing() bool            { return v.filter.IsActive() }
+func (v *QuotasView) IsTextEditing() bool            { return v.base.filter.IsActive() }
 
 func (v *QuotasView) Init() tea.Cmd { return tea.Batch(v.fetchShares(), v.fetchUsers()) }
 
@@ -80,12 +79,12 @@ func (v *QuotasView) fetchUsers() tea.Cmd {
 }
 
 func (v *QuotasView) filterShares() []dsm.ShareQuota {
-	if v.filter.Value() == "" {
+	if v.base.FilterValue() == "" {
 		return v.shares
 	}
 	out := make([]dsm.ShareQuota, 0, len(v.shares))
 	for _, q := range v.shares {
-		if MatchesAll(v.filter.Value(), q.Name, q.Path, q.Description) {
+		if v.base.FilterMatch(q.Name, q.Path, q.Description) {
 			out = append(out, q)
 		}
 	}
@@ -93,7 +92,7 @@ func (v *QuotasView) filterShares() []dsm.ShareQuota {
 }
 
 func (v *QuotasView) filterUsers() []dsm.UserQuota {
-	if v.filter.Value() == "" {
+	if v.base.FilterValue() == "" {
 		return v.users
 	}
 	out := make([]dsm.UserQuota, 0, len(v.users))
@@ -102,7 +101,7 @@ func (v *QuotasView) filterUsers() []dsm.UserQuota {
 		for _, vol := range q.Volumes {
 			volumes += " " + vol.Volume
 		}
-		if MatchesAll(v.filter.Value(), q.Name, volumes) {
+		if v.base.FilterMatch(q.Name, volumes) {
 			out = append(out, q)
 		}
 	}
@@ -138,27 +137,19 @@ func (v *QuotasView) rows() []quotaRow {
 
 func (v *QuotasView) current() (quotaRow, bool) {
 	rs := v.rows()
-	if v.cursor < 0 || v.cursor >= len(rs) {
-		return quotaRow{}, false
+	if c := v.base.Cursor(); c < len(rs) {
+		return rs[c], true
 	}
-	return rs[v.cursor], true
+	return quotaRow{}, false
 }
 
 func (v *QuotasView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detailShare != nil || v.detailUser != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail swallows keys only; data messages still land underneath.
+	if km, ok := msg.(tea.KeyMsg); ok && (v.detailShare != nil || v.detailUser != nil) {
+		if km.String() == "esc" || km.String() == "q" {
 			v.detailShare, v.detailUser = nil, nil
 		}
 		return v, nil
-	}
-	if v.filter.IsActive() {
-		before := v.filter.Value()
-		if v.filter.Update(msg) {
-			if v.filter.Value() != before {
-				v.cursor = 0
-			}
-			return v, nil
-		}
 	}
 	switch m := msg.(type) {
 	case tui.TickMsg:
@@ -166,34 +157,19 @@ func (v *QuotasView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 	case shareQuotasMsg:
 		v.shares, v.sharesErr = m.Q, m.Err
 		v.loaded = true
-		v.clampCursor()
+		v.base.ClampCursor(len(v.rows()))
+		return v, nil
 	case userQuotasMsg:
 		v.users, v.usersErr = m.Q, m.Err
 		v.loaded = true
-		v.clampCursor()
-	case tea.KeyMsg:
+		v.base.ClampCursor(len(v.rows()))
+		return v, nil
+	}
+	if _, handled := v.base.HandleKey(msg, len(v.rows())); handled {
+		return v, nil
+	}
+	if m, ok := msg.(tea.KeyMsg); ok {
 		switch m.String() {
-		case "j", "down":
-			rs := v.rows()
-			if v.cursor < len(rs)-1 {
-				v.cursor++
-			}
-		case "k", "up":
-			if v.cursor > 0 {
-				v.cursor--
-			}
-		case "g":
-			v.cursor = 0
-		case "G":
-			v.cursor = max(len(v.rows())-1, 0)
-		case "/":
-			v.filter.Open()
-			v.cursor = 0
-		case "esc":
-			if v.filter.Value() != "" {
-				v.filter.Clear()
-				v.cursor = 0
-			}
 		case "r":
 			return v, tea.Batch(v.fetchShares(), v.fetchUsers())
 		case "enter":
@@ -210,16 +186,6 @@ func (v *QuotasView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		}
 	}
 	return v, nil
-}
-
-func (v *QuotasView) clampCursor() {
-	n := len(v.rows())
-	if v.cursor >= n {
-		v.cursor = n - 1
-	}
-	if v.cursor < 0 {
-		v.cursor = 0
-	}
 }
 
 func (v *QuotasView) Render(width, height int) string {
@@ -242,6 +208,7 @@ func (v *QuotasView) Render(width, height int) string {
 	shares := v.filterShares()
 	users := v.filterUsers()
 	idx := 0
+	cursor := v.base.Cursor()
 
 	var parts []string
 	parts = append(parts, sectionHeader(t, width, "Per-share quotas", len(shares), v.sharesErr))
@@ -251,7 +218,7 @@ func (v *QuotasView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(no shares with a configured quota)"))
 	}
 	for _, q := range shares {
-		parts = append(parts, v.renderShareRow(q, idx == v.cursor, width))
+		parts = append(parts, clipTo(v.renderShareRow(q, idx == cursor, width), width))
 		idx++
 	}
 
@@ -262,14 +229,14 @@ func (v *QuotasView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(no users with a configured quota)"))
 	}
 	for _, q := range users {
-		parts = append(parts, v.renderUserRow(q, idx == v.cursor))
+		parts = append(parts, clipTo(v.renderUserRow(q, idx == cursor), width))
 		idx++
 	}
 
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
 		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
-	if fr := v.filter.Render(t); fr != "" {
+	if fr := v.base.FilterFooter(t); fr != "" {
 		parts = append(parts, fr)
 	}
 	return fitOrScroll(strings.Join(parts, "\n"), height)

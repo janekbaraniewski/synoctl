@@ -36,6 +36,9 @@ func (d *Disks) Icon() string                   { return "●" }
 func (d *Disks) RefreshInterval() time.Duration { return 30 * time.Second }
 func (d *Disks) Bindings() []key.Binding        { return BaseBindings() }
 
+// IsTextEditing defers global keys while the inline filter owns input.
+func (d *Disks) IsTextEditing() bool { return d.base.filter.IsActive() }
+
 func (d *Disks) Init() tea.Cmd { return d.fetch() }
 
 func (d *Disks) fetch() tea.Cmd {

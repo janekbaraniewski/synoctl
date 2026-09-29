@@ -45,6 +45,7 @@ func (v *TimeRegionView) Name() string                   { return "time-region" 
 func (v *TimeRegionView) Title() string                  { return "Time & Region" }
 func (v *TimeRegionView) Icon() string                   { return "⌚" }
 func (v *TimeRegionView) RefreshInterval() time.Duration { return 1 * time.Second }
+func (v *TimeRegionView) Hint() string                   { return "r refresh" }
 func (v *TimeRegionView) Bindings() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),

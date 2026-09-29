@@ -197,19 +197,27 @@ func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		return v, v.fetchTasks()
 	}
 
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlay owns keys only; data/tick messages (incl. the lazy
+	// version fetch it renders) fall through so they still land.
+	if km, ok := msg.(tea.KeyMsg); ok && v.detail != nil {
+		switch km.String() {
+		case "esc", "q":
 			v.detail = nil
+		case "X", "C":
+			tk := *v.detail
+			v.detail = nil
+			v.askAction(km.String(), tk)
 		}
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		cur, had := v.currentTask()
 		before := v.filter.Value()
 		if v.filter.Update(msg) {
 			if v.filter.Value() != before {
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
-			return v, nil
+			return v, v.ensureVersions()
 		}
 	}
 	switch m := msg.(type) {
@@ -219,10 +227,16 @@ func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.tasks, v.tasksErr = m.T, m.Err
 		v.loaded = true
 		v.clampCursor()
-		// Kick off a version fetch for whatever's now under the cursor.
-		if t, ok := v.currentTask(); ok {
-			return v, v.fetchVersions(t.TaskID)
+		if v.detail != nil {
+			for _, tk := range v.tasks {
+				if tk.TaskID == v.detail.TaskID {
+					v.detail = &tk
+					break
+				}
+			}
 		}
+		// Kick off a version fetch for whatever's now under the cursor.
+		return v, v.ensureVersions()
 	case abVersionsMsg:
 		if m.Err == nil && len(m.V) > 0 {
 			latest := m.V[0]
@@ -242,20 +256,10 @@ func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			rows := v.filtered()
 			if v.cursor < len(rows)-1 {
 				v.cursor++
-				if t, ok := v.currentTask(); ok {
-					if _, cached := v.latest[t.TaskID]; !cached {
-						return v, v.fetchVersions(t.TaskID)
-					}
-				}
 			}
 		case "k", "up":
 			if v.cursor > 0 {
 				v.cursor--
-				if t, ok := v.currentTask(); ok {
-					if _, cached := v.latest[t.TaskID]; !cached {
-						return v, v.fetchVersions(t.TaskID)
-					}
-				}
 			}
 		case "g":
 			v.cursor = 0
@@ -263,11 +267,11 @@ func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
-			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
+				cur, had := v.currentTask()
 				v.filter.Clear()
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 		case "r":
 			return v, v.fetchTasks()
@@ -275,23 +279,53 @@ func (v *ActiveBackupView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			if tk, ok := v.currentTask(); ok {
 				v.detail = &tk
 			}
-		case "X":
+		case "X", "C":
 			if tk, ok := v.currentTask(); ok {
-				v.confirm.Ask(
-					fmt.Sprintf("run:%d:%s", tk.TaskID, tk.Name),
-					fmt.Sprintf("Run Active Backup task %s now?", tk.Name),
-					"It may use significant bandwidth and load the source for the duration of the backup.")
-			}
-		case "C":
-			if tk, ok := v.currentTask(); ok {
-				v.confirm.Ask(
-					fmt.Sprintf("cancel:%d:%s", tk.TaskID, tk.Name),
-					fmt.Sprintf("Cancel Active Backup task %s?", tk.Name),
-					"Stops the in-flight backup. The task remains scheduled.")
+				v.askAction(m.String(), tk)
 			}
 		}
+		return v, v.ensureVersions()
 	}
 	return v, nil
+}
+
+// ensureVersions fetches the latest version for the task under the
+// cursor unless it's already cached. Called after every cursor move so
+// g/G/filter jumps and the detail overlay get their snapshot too.
+func (v *ActiveBackupView) ensureVersions() tea.Cmd {
+	t, ok := v.currentTask()
+	if !ok {
+		return nil
+	}
+	if _, cached := v.latest[t.TaskID]; cached {
+		return nil
+	}
+	return v.fetchVersions(t.TaskID)
+}
+
+// askAction opens the confirm modal for the X / C write keys.
+func (v *ActiveBackupView) askAction(k string, tk dsm.ABTask) {
+	switch k {
+	case "X":
+		v.confirm.Ask(
+			fmt.Sprintf("run:%d:%s", tk.TaskID, tk.Name),
+			fmt.Sprintf("Run Active Backup task %s now?", tk.Name),
+			"It may use significant bandwidth and load the source for the duration of the backup.")
+	case "C":
+		v.confirm.Ask(
+			fmt.Sprintf("cancel:%d:%s", tk.TaskID, tk.Name),
+			fmt.Sprintf("Cancel Active Backup task %s?", tk.Name),
+			"Stops the in-flight backup. The task remains scheduled.")
+	}
+}
+
+// reselect keeps the cursor on the previously selected task after the
+// filter changes, falling back to the first row when it's filtered out.
+func (v *ActiveBackupView) reselect(prev dsm.ABTask, had bool) {
+	v.cursor = 0
+	if had {
+		v.cursor = indexWhere(v.filtered(), func(t dsm.ABTask) bool { return t.TaskID == prev.TaskID })
+	}
 }
 
 func (v *ActiveBackupView) currentTask() (dsm.ABTask, bool) {
@@ -337,7 +371,7 @@ func (v *ActiveBackupView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none matching)"))
 	}
 	for i, tk := range tasks {
-		parts = append(parts, v.renderRow(tk, i == v.cursor))
+		parts = append(parts, v.renderRow(tk, i == v.cursor, width))
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
@@ -345,13 +379,10 @@ func (v *ActiveBackupView) Render(width, height int) string {
 	if v.flash != "" {
 		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+v.flash))
 	}
-	if fr := v.filter.Render(t); fr != "" {
-		parts = append(parts, fr)
-	}
-	return fitOrScroll(strings.Join(parts, "\n"), height)
+	return withFilterLine(strings.Join(parts, "\n"), v.filter.Render(t), height)
 }
 
-func (v *ActiveBackupView) renderRow(tk dsm.ABTask, highlight bool) string {
+func (v *ActiveBackupView) renderRow(tk dsm.ABTask, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -371,13 +402,18 @@ func (v *ActiveBackupView) renderRow(tk dsm.ABTask, highlight bool) string {
 	}
 	dev := tk.DeviceType
 	if tk.DeviceName != "" {
-		dev = clipTo(tk.DeviceName, 22)
+		dev = tk.DeviceName
+	}
+	// Device is the flexible column so status stays visible when narrow.
+	devCol := ""
+	if w := flexCol(width, 2+23+11+19+10, 22, 8); w > 0 {
+		devCol = padRight(mu.Render(clipTo(dev, w)), w) + " "
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
-		padRight(text.Render(tk.Name), 22), " ",
+		padRight(text.Render(clipTo(tk.Name, 22)), 22), " ",
 		padRight(mu.Render(padRight(tk.DeviceType, 10)), 10), " ",
-		padRight(mu.Render(clipTo(dev, 22)), 22), " ",
+		devCol,
 		padRight(mu.Render(lastRun), 18), " ",
 		t.HealthStyle(status).Render(status),
 	)

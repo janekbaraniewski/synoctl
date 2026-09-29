@@ -111,6 +111,9 @@ func (v *ContainersView) Hint() string {
 	return ""
 }
 
+// IsTextEditing defers global keys while the inline filter owns input.
+func (v *ContainersView) IsTextEditing() bool { return v.base().filter.IsActive() }
+
 func (v *ContainersView) Init() tea.Cmd {
 	return tea.Batch(v.fetchContainers(), v.fetchImages(), v.fetchNetworks())
 }
@@ -419,6 +422,8 @@ func (v *ContainersView) renderContainers(width int) []string {
 	if nameW > 28 {
 		nameW = 28
 	}
+	// Shrink the image column on narrow panes so the status stays visible.
+	imageW = max(min(imageW, width-(2+nameW+1+1+8+11+10)), 8)
 	for i, c := range rows {
 		out = append(out, v.renderContainerRow(c, i == v.base().Cursor(), nameW, imageW))
 	}
@@ -426,7 +431,6 @@ func (v *ContainersView) renderContainers(width int) []string {
 }
 
 func (v *ContainersView) renderImages(width int) []string {
-	_ = width
 	t := v.ctx.Theme
 	rows := v.visibleImages()
 	out := []string{sectionHeader(t, width, "Images", len(rows), v.iErr)}
@@ -457,6 +461,7 @@ func (v *ContainersView) renderImages(width int) []string {
 	if tagW > 20 {
 		tagW = 20
 	}
+	repoW = max(min(repoW, width-(2+1+tagW+1+10+1+12+1+6+1)), 8)
 	for i, img := range rows {
 		out = append(out, v.renderImageRow(img, i == v.base().Cursor(), repoW, tagW))
 	}

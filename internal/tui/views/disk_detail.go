@@ -77,7 +77,7 @@ func renderDiskDetail(t tui.Theme, width, height int, d dsm.Disk, pools []dsm.St
 	}
 
 	parts = append(parts, noteCard(t, width,
-		"  esc to go back · J for raw JSON · destructive disk actions are intentionally not wired"))
+		"  esc back · ↑/↓ scroll · disk actions are intentionally not wired"))
 	return strings.Join(parts, "\n")
 }
 

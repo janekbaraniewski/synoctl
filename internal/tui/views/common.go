@@ -267,3 +267,33 @@ func itoaShort(n int) string {
 	}
 	return string(digits[i:])
 }
+
+// indexWhere returns the index of the first row matching pred, or 0.
+// Views use it to keep the cursor on the same item across filter edits.
+func indexWhere[T any](rows []T, pred func(T) bool) int {
+	for i, r := range rows {
+		if pred(r) {
+			return i
+		}
+	}
+	return 0
+}
+
+// flexCol sizes a flexible table column: whatever width is left after
+// `fixed`, capped at maxW. Returns 0 (drop the column) below minW.
+func flexCol(width, fixed, maxW, minW int) int {
+	w := min(width-fixed-1, maxW)
+	if w < minW {
+		return 0
+	}
+	return w
+}
+
+// withFilterLine fits body to height, pinning the filter prompt (when
+// present) to the last line so it never scrolls off a long list.
+func withFilterLine(body, filterLine string, height int) string {
+	if filterLine == "" {
+		return fitOrScroll(body, height)
+	}
+	return fitOrScroll(body, max(height-1, 1)) + "\n" + filterLine
+}

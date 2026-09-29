@@ -34,6 +34,8 @@ func BaseBindings() []key.Binding {
 // handling.
 func (b *listBase) HandleKey(msg tea.Msg, rowCount int) (tea.Cmd, bool) {
 	// Filter editing swallows runes when open.
+	// Unconsumed keys (arrows, pgup/pgdn) fall through so the cursor
+	// still moves while typing.
 	if b.filter.IsActive() {
 		before := b.filter.Value()
 		if b.filter.Update(msg) {
@@ -42,7 +44,6 @@ func (b *listBase) HandleKey(msg tea.Msg, rowCount int) (tea.Cmd, bool) {
 			}
 			return nil, true
 		}
-		return nil, false
 	}
 
 	km, ok := msg.(tea.KeyMsg)
@@ -60,10 +61,16 @@ func (b *listBase) HandleKey(msg tea.Msg, rowCount int) (tea.Cmd, bool) {
 			b.cursor--
 		}
 		return nil, true
-	case "g":
+	case "pgdown", "ctrl+d":
+		b.cursor = min(b.cursor+10, max(rowCount-1, 0))
+		return nil, true
+	case "pgup", "ctrl+u":
+		b.cursor = max(b.cursor-10, 0)
+		return nil, true
+	case "home", "g":
 		b.cursor = 0
 		return nil, true
-	case "G":
+	case "end", "G":
 		b.cursor = max(rowCount-1, 0)
 		return nil, true
 	case "/":

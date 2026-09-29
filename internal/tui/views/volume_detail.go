@@ -43,7 +43,7 @@ func renderVolumeDetail(t tui.Theme, width, height int, vol dsm.Volume, pools []
 	}
 	body := strings.Join(parts, "\n")
 	footer := lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"  esc to go back · F browses files on this volume")
+		"  esc back · ↑/↓ scroll")
 	body = body + "\n" + footer
 	return body
 }
@@ -152,7 +152,7 @@ func renderTwoColumnProps(t tui.Theme, inner int, kv [][2]string) string {
 		// Reserve ~16 chars for the key column.
 		const keyW = 16
 		key := keyStyle.Render(padRight(k, keyW))
-		val := valStyle.Render(clipTo(v, colW-keyW-1))
+		val := valStyle.Render(clipTo(v, colW-keyW-2))
 		return key + " " + val
 	}
 	var b strings.Builder

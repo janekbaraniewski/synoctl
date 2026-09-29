@@ -72,17 +72,20 @@ func (v *CertsView) filtered() []dsm.Certificate {
 }
 
 func (v *CertsView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlay owns keys only; data/tick messages fall through so
+	// refreshes still land while it's open.
+	if km, ok := msg.(tea.KeyMsg); ok && v.detail != nil {
+		if km.String() == "esc" || km.String() == "q" {
 			v.detail = nil
 		}
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		cur, had := v.current()
 		before := v.filter.Value()
 		if v.filter.Update(msg) {
 			if v.filter.Value() != before {
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 			return v, nil
 		}
@@ -94,6 +97,7 @@ func (v *CertsView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.certs, v.certsErr = m.C, m.Err
 		v.loaded = true
 		v.clampCursor()
+		v.syncDetail()
 	case tea.KeyMsg:
 		switch m.String() {
 		case "j", "down":
@@ -111,23 +115,52 @@ func (v *CertsView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
-			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
+				cur, had := v.current()
 				v.filter.Clear()
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 		case "r":
 			return v, v.fetch()
 		case "enter":
-			rows := v.filtered()
-			if v.cursor >= 0 && v.cursor < len(rows) {
-				c := rows[v.cursor]
-				v.detail = &c
+			if x, ok := v.current(); ok {
+				v.detail = &x
 			}
 		}
 	}
 	return v, nil
+}
+
+// current returns the row under the cursor in the filtered list.
+func (v *CertsView) current() (dsm.Certificate, bool) {
+	rows := v.filtered()
+	if v.cursor < 0 || v.cursor >= len(rows) {
+		return dsm.Certificate{}, false
+	}
+	return rows[v.cursor], true
+}
+
+// reselect keeps the cursor on the previously selected row after the
+// filter changes, falling back to the first row when it's filtered out.
+func (v *CertsView) reselect(prev dsm.Certificate, had bool) {
+	v.cursor = 0
+	if had {
+		v.cursor = indexWhere(v.filtered(), func(x dsm.Certificate) bool { return x.ID == prev.ID })
+	}
+}
+
+// syncDetail swaps the open detail snapshot for its refreshed copy.
+func (v *CertsView) syncDetail() {
+	if v.detail == nil {
+		return
+	}
+	for _, x := range v.certs {
+		if x.ID == v.detail.ID {
+			v.detail = &x
+			return
+		}
+	}
 }
 
 func (v *CertsView) clampCursor() {
@@ -162,15 +195,12 @@ func (v *CertsView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(none matching)"))
 	}
 	for i, c := range certs {
-		parts = append(parts, v.renderRow(c, i == v.cursor))
+		parts = append(parts, v.renderRow(c, i == v.cursor, width))
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
 		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
-	if fr := v.filter.Render(t); fr != "" {
-		parts = append(parts, fr)
-	}
-	return fitOrScroll(strings.Join(parts, "\n"), height)
+	return withFilterLine(strings.Join(parts, "\n"), v.filter.Render(t), height)
 }
 
 // parseCertTime tolerates the half-dozen formats DSM has shipped over
@@ -213,7 +243,7 @@ func certExpiryStyle(t tui.Theme, validTo string) lipgloss.Style {
 	}
 }
 
-func (v *CertsView) renderRow(c dsm.Certificate, highlight bool) string {
+func (v *CertsView) renderRow(c dsm.Certificate, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -226,10 +256,15 @@ func (v *CertsView) renderRow(c dsm.Certificate, highlight bool) string {
 	}
 	flagsRendered := strings.Join(flags, " ")
 	expiry := certExpiryStyle(t, c.ValidTo).Render(c.ValidTo)
+	// Issuer is the flexible column so expiry + flags stay visible.
+	issuerCol := ""
+	if w := flexCol(width, 2+29+25+15, 26, 8); w > 0 {
+		issuerCol = padRight(mu.Render(clipTo(c.Issuer, w)), w) + " "
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(clipTo(c.Subject, 28)), 28), " ",
-		padRight(mu.Render(clipTo(c.Issuer, 26)), 26), " ",
+		issuerCol,
 		padRight(expiry, 24), " ",
 		flagsRendered,
 	)

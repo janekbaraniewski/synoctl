@@ -44,6 +44,7 @@ func (v *DSMUpdateView) Icon() string  { return "⇡" }
 // nothing about this surface needs to be live.
 func (v *DSMUpdateView) RefreshInterval() time.Duration { return 10 * time.Minute }
 
+func (v *DSMUpdateView) Hint() string { return "r re-check upstream" }
 func (v *DSMUpdateView) Bindings() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "re-check upstream")),

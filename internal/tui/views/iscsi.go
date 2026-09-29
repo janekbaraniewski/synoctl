@@ -98,6 +98,9 @@ func (v *ISCSIView) Hint() string {
 	return ""
 }
 
+// IsTextEditing defers global keys while the inline filter owns input.
+func (v *ISCSIView) IsTextEditing() bool { return v.base().filter.IsActive() }
+
 func (v *ISCSIView) Init() tea.Cmd {
 	return tea.Batch(v.fetchTargets(), v.fetchLUNs())
 }
@@ -165,9 +168,10 @@ func (v *ISCSIView) visibleCount() int {
 }
 
 func (v *ISCSIView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	// Detail overlay swallows everything except esc/q.
-	if v.detailTarget != nil || v.detailLUN != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlay swallows every key except esc/q; data messages
+	// still land so the list is fresh on return.
+	if km, ok := msg.(tea.KeyMsg); ok && (v.detailTarget != nil || v.detailLUN != nil) {
+		if km.String() == "esc" || km.String() == "q" {
 			v.detailTarget, v.detailLUN = nil, nil
 		}
 		return v, nil
@@ -302,7 +306,7 @@ func (v *ISCSIView) renderTargets(width int) []string {
 	}
 	cursor := v.bases[iscsiModeTargets].Cursor()
 	for i, tg := range rows {
-		out = append(out, v.renderTargetRow(tg, i == cursor))
+		out = append(out, clipTo(v.renderTargetRow(width, tg, i == cursor), width))
 	}
 	return out
 }
@@ -321,12 +325,12 @@ func (v *ISCSIView) renderLUNs(width int) []string {
 	}
 	cursor := v.bases[iscsiModeLUNs].Cursor()
 	for i, l := range rows {
-		out = append(out, v.renderLUNRow(l, i == cursor))
+		out = append(out, clipTo(v.renderLUNRow(l, i == cursor), width))
 	}
 	return out
 }
 
-func (v *ISCSIView) renderTargetRow(tg dsm.ISCSITarget, highlight bool) string {
+func (v *ISCSIView) renderTargetRow(width int, tg dsm.ISCSITarget, highlight bool) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text).Bold(true)
@@ -338,10 +342,12 @@ func (v *ISCSIView) renderTargetRow(tg dsm.ISCSITarget, highlight bool) string {
 	if auth == "" {
 		auth = "none"
 	}
+	// The IQN column absorbs narrow panes so state stays visible.
+	iqnW := min(max(width-54, 16), 40)
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		padRight(text.Render(clipTo(tg.Name, 22)), 22), " ",
-		padRight(mu.Render(clipTo(tg.IQN, 40)), 40), " ",
+		padRight(mu.Render(clipTo(tg.IQN, iqnW)), iqnW), " ",
 		padLeft(mu.Render(fmt.Sprintf("%d conn", tg.ConnectionCount)), 9), " ",
 		padRight(mu.Render(auth), 8), " ",
 		t.HealthStyle(state).Render(state),

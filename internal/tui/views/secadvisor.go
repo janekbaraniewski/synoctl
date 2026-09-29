@@ -90,17 +90,20 @@ func (v *SecurityAdvisorView) filtered() []dsm.SecAdvisorItem {
 }
 
 func (v *SecurityAdvisorView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
-	if v.detail != nil {
-		if km, ok := msg.(tea.KeyMsg); ok && (km.String() == "esc" || km.String() == "q") {
+	// Detail overlay owns keys only; data/tick messages fall through so
+	// refreshes still land while it's open.
+	if km, ok := msg.(tea.KeyMsg); ok && v.detail != nil {
+		if km.String() == "esc" || km.String() == "q" {
 			v.detail = nil
 		}
 		return v, nil
 	}
 	if v.filter.IsActive() {
+		cur, had := v.current()
 		before := v.filter.Value()
 		if v.filter.Update(msg) {
 			if v.filter.Value() != before {
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 			return v, nil
 		}
@@ -115,6 +118,7 @@ func (v *SecurityAdvisorView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 		v.items, v.itemsErr = m.I, m.Err
 		v.loaded = true
 		v.clampCursor()
+		v.syncDetail()
 	case tea.KeyMsg:
 		switch m.String() {
 		case "j", "down":
@@ -132,23 +136,52 @@ func (v *SecurityAdvisorView) Update(msg tea.Msg) (tui.View, tea.Cmd) {
 			v.cursor = max(len(v.filtered())-1, 0)
 		case "/":
 			v.filter.Open()
-			v.cursor = 0
 		case "esc":
 			if v.filter.Value() != "" {
+				cur, had := v.current()
 				v.filter.Clear()
-				v.cursor = 0
+				v.reselect(cur, had)
 			}
 		case "r":
 			return v, tea.Batch(v.fetchReport(), v.fetchItems())
 		case "enter":
-			rows := v.filtered()
-			if v.cursor >= 0 && v.cursor < len(rows) {
-				it := rows[v.cursor]
-				v.detail = &it
+			if x, ok := v.current(); ok {
+				v.detail = &x
 			}
 		}
 	}
 	return v, nil
+}
+
+// current returns the row under the cursor in the filtered list.
+func (v *SecurityAdvisorView) current() (dsm.SecAdvisorItem, bool) {
+	rows := v.filtered()
+	if v.cursor < 0 || v.cursor >= len(rows) {
+		return dsm.SecAdvisorItem{}, false
+	}
+	return rows[v.cursor], true
+}
+
+// reselect keeps the cursor on the previously selected row after the
+// filter changes, falling back to the first row when it's filtered out.
+func (v *SecurityAdvisorView) reselect(prev dsm.SecAdvisorItem, had bool) {
+	v.cursor = 0
+	if had {
+		v.cursor = indexWhere(v.filtered(), func(x dsm.SecAdvisorItem) bool { return x.ID == prev.ID })
+	}
+}
+
+// syncDetail swaps the open detail snapshot for its refreshed copy.
+func (v *SecurityAdvisorView) syncDetail() {
+	if v.detail == nil {
+		return
+	}
+	for _, x := range v.items {
+		if x.ID == v.detail.ID {
+			v.detail = &x
+			return
+		}
+	}
 }
 
 func (v *SecurityAdvisorView) clampCursor() {
@@ -185,15 +218,12 @@ func (v *SecurityAdvisorView) Render(width, height int) string {
 		parts = append(parts, "  "+muted(t, "(no items)"))
 	}
 	for i, it := range items {
-		parts = append(parts, v.renderRow(it, i == v.cursor))
+		parts = append(parts, v.renderRow(it, i == v.cursor, width))
 	}
 	parts = append(parts, "")
 	parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(
 		"  ↑/↓ move · ⏎ details · / filter · esc clear · r refresh"))
-	if fr := v.filter.Render(t); fr != "" {
-		parts = append(parts, fr)
-	}
-	return fitOrScroll(strings.Join(parts, "\n"), height)
+	return withFilterLine(strings.Join(parts, "\n"), v.filter.Render(t), height)
 }
 
 func severityStyle(t tui.Theme, sev string) lipgloss.Style {
@@ -279,7 +309,7 @@ func (v *SecurityAdvisorView) renderSummary(width int) string {
 	return t.Card(false).Width(width - 2).Render(body)
 }
 
-func (v *SecurityAdvisorView) renderRow(it dsm.SecAdvisorItem, highlight bool) string {
+func (v *SecurityAdvisorView) renderRow(it dsm.SecAdvisorItem, highlight bool, width int) string {
 	t := v.ctx.Theme
 	mu := lipgloss.NewStyle().Foreground(t.Muted)
 	text := lipgloss.NewStyle().Foreground(t.Text)
@@ -292,11 +322,18 @@ func (v *SecurityAdvisorView) renderRow(it dsm.SecAdvisorItem, highlight bool) s
 	if it.LastScanned > 0 {
 		scanned = time.Unix(it.LastScanned, 0).Format("2006-01-02 15:04")
 	}
+	// Title shrinks, then category drops, to keep the scan date on screen.
+	fixed := 2 + 9 + 16
+	titleW := max(flexCol(width, fixed, 40, 16), 16)
+	catCol := ""
+	if w := flexCol(width, fixed+titleW+1, 18, 6); w > 0 {
+		catCol = padRight(mu.Render(clipTo(it.Category, w)), w) + " "
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
 		badge, " ",
-		padRight(text.Render(clipTo(it.Title, 40)), 40), " ",
-		padRight(mu.Render(it.Category), 18), " ",
+		padRight(text.Render(clipTo(it.Title, titleW)), titleW), " ",
+		catCol,
 		mu.Render(scanned),
 	)
 }
