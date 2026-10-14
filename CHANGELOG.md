@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.13](https://github.com/janekbaraniewski/synoctl/compare/v0.2.12...v0.2.13) (2026-10-14)
+
+
+### Dependencies
+
+* **deps:** bump github.com/charmbracelet/x/ansi from 0.11.8 to 0.11.9 in the go-minor-and-patch group ([#77](https://github.com/janekbaraniewski/synoctl/issues/77)) ([2a569e3](https://github.com/janekbaraniewski/synoctl/commit/2a569e3b45a9c8f2b61a611754daea55d6dc738b))
+
 ## [0.2.12](https://github.com/janekbaraniewski/synoctl/compare/v0.2.11...v0.2.12) (2026-09-29)
 
 
