@@ -10,24 +10,25 @@ import (
 // ScheduledTask is one entry from SYNO.Core.TaskScheduler.list — a
 // Task Scheduler entry (script, beep test, system reboot, S.M.A.R.T.
 // test, etc.). type values include "script", "service", "reboot",
-// "shutdown", "smart_test". next_trigger_time is epoch seconds on
-// DSM 7.x; older DSM 6 returned an ISO string in the same field.
+// "shutdown", "smart_test". next_trigger_time arrives as epoch seconds
+// or as a "YYYY-MM-DD HH:MM" string depending on firmware (DSM 7.4
+// sends the string), hence flexEpoch.
 type ScheduledTask struct {
-	ID              int      `json:"id"`
-	Name            string   `json:"name"`
-	Type            string   `json:"type,omitempty"`
-	Enable          flexBool `json:"enable,omitempty"`
-	Owner           string   `json:"owner,omitempty"`
-	OwnerUID        int      `json:"owner_uid,omitempty"`
-	NextTriggerTime int64    `json:"next_trigger_time,omitempty"`
-	LastRunTime     int64    `json:"last_run_time,omitempty"`
-	LastRunResult   string   `json:"last_run_result,omitempty"`
-	Repeat          string   `json:"repeat,omitempty"` // "daily", "weekly", "monthly", "once"
-	RepeatHour      int      `json:"repeat_hour,omitempty"`
-	RepeatMin       int      `json:"repeat_min,omitempty"`
-	CanRun          flexBool `json:"can_run,omitempty"`
-	CanEdit         flexBool `json:"can_edit,omitempty"`
-	Action          string   `json:"action,omitempty"`
+	ID              int       `json:"id"`
+	Name            string    `json:"name"`
+	Type            string    `json:"type,omitempty"`
+	Enable          flexBool  `json:"enable,omitempty"`
+	Owner           string    `json:"owner,omitempty"`
+	OwnerUID        int       `json:"owner_uid,omitempty"`
+	NextTriggerTime flexEpoch `json:"next_trigger_time,omitempty"`
+	LastRunTime     flexEpoch `json:"last_run_time,omitempty"`
+	LastRunResult   string    `json:"last_run_result,omitempty"`
+	Repeat          string    `json:"repeat,omitempty"` // "daily", "weekly", "monthly", "once"
+	RepeatHour      int       `json:"repeat_hour,omitempty"`
+	RepeatMin       int       `json:"repeat_min,omitempty"`
+	CanRun          flexBool  `json:"can_run,omitempty"`
+	CanEdit         flexBool  `json:"can_edit,omitempty"`
+	Action          string    `json:"action,omitempty"`
 }
 
 // ScheduledTasks lists Task Scheduler entries via SYNO.Core.TaskScheduler
