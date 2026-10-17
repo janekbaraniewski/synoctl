@@ -309,7 +309,7 @@ func (v *SchedTasksView) renderRow(tk dsm.ScheduledTask, highlight bool) string 
 	}
 	next := "—"
 	if tk.NextTriggerTime > 0 {
-		next = time.Unix(tk.NextTriggerTime, 0).Format("2006-01-02 15:04")
+		next = time.Unix(tk.NextTriggerTime.Int64(), 0).Format("2006-01-02 15:04")
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Center,
 		caretGlyph(t, highlight), " ",
@@ -344,10 +344,10 @@ func renderSchedTaskDetail(t tui.Theme, width int, tk dsm.ScheduledTask) string 
 	}
 	next, last := "—", "—"
 	if tk.NextTriggerTime > 0 {
-		next = time.Unix(tk.NextTriggerTime, 0).Format("2006-01-02 15:04")
+		next = time.Unix(tk.NextTriggerTime.Int64(), 0).Format("2006-01-02 15:04")
 	}
 	if tk.LastRunTime > 0 {
-		last = time.Unix(tk.LastRunTime, 0).Format("2006-01-02 15:04")
+		last = time.Unix(tk.LastRunTime.Int64(), 0).Format("2006-01-02 15:04")
 	}
 	repeatTime := "—"
 	if tk.RepeatHour > 0 || tk.RepeatMin > 0 {
@@ -393,10 +393,10 @@ func renderSchedTaskInspect(t tui.Theme, width int, tk dsm.ScheduledTask) string
 	}
 	next, last := "—", "—"
 	if tk.NextTriggerTime > 0 {
-		next = time.Unix(tk.NextTriggerTime, 0).Format("2006-01-02 15:04")
+		next = time.Unix(tk.NextTriggerTime.Int64(), 0).Format("2006-01-02 15:04")
 	}
 	if tk.LastRunTime > 0 {
-		last = time.Unix(tk.LastRunTime, 0).Format("2006-01-02 15:04")
+		last = time.Unix(tk.LastRunTime.Int64(), 0).Format("2006-01-02 15:04")
 	}
 	return strings.Join([]string{
 		t.Title().Render(" Scheduled task "),
