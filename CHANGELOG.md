@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.13](https://github.com/janekbaraniewski/synoctl/compare/v0.2.12...v0.2.13) (2026-11-09)
+
+
+### Bug Fixes
+
+* **dsm:** accept string next_trigger_time from Task Scheduler ([#80](https://github.com/janekbaraniewski/synoctl/issues/80)) ([8c8f2e8](https://github.com/janekbaraniewski/synoctl/commit/8c8f2e8dabc52bbd8166670d9ef38265b53319d4))
+
+
+### Dependencies
+
+* **deps:** bump github.com/charmbracelet/x/ansi from 0.11.8 to 0.11.9 in the go-minor-and-patch group ([#77](https://github.com/janekbaraniewski/synoctl/issues/77)) ([2a569e3](https://github.com/janekbaraniewski/synoctl/commit/2a569e3b45a9c8f2b61a611754daea55d6dc738b))
+
 ## [0.2.12](https://github.com/janekbaraniewski/synoctl/compare/v0.2.11...v0.2.12) (2026-09-29)
 
 
